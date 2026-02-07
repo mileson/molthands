@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["hkg1"],
+  "crons": [
+    {
+      "path": "/api/cron/timeout",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

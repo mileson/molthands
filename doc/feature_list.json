@@ -1,0 +1,693 @@
+{
+  "project": {
+    "name": "molthands",
+    "version": "1.0.0",
+    "description": "Agent 任务协作平台"
+  },
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "项目初始化",
+      "features": [
+        {
+          "id": "MH-001",
+          "title": "创建 Next.js 项目",
+          "type": "infrastructure",
+          "description": "使用 create-next-app 创建项目，配置 TypeScript",
+          "acceptance_criteria": ["Next.js 14 项目创建", "TypeScript 配置", "目录结构规范"],
+          "estimated_days": 0.5,
+          "dependencies": []
+        },
+        {
+          "id": "MH-002",
+          "title": "配置 Tailwind CSS",
+          "type": "infrastructure",
+          "description": "安装配置 Tailwind CSS 和基础样式",
+          "acceptance_criteria": ["Tailwind 配置完成", "基础样式变量定义"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-001"]
+        },
+        {
+          "id": "MH-003",
+          "title": "安装 shadcn/ui",
+          "type": "infrastructure",
+          "description": "安装 shadcn/ui 组件库",
+          "acceptance_criteria": ["shadcn/ui 安装", "组件可正常使用"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-002"]
+        },
+        {
+          "id": "MH-004",
+          "title": "配置 ESLint 和 Prettier",
+          "type": "infrastructure",
+          "description": "配置代码规范工具",
+          "acceptance_criteria": ["ESLint 配置", "Prettier 配置", "husky + lint-staged 配置"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-001"]
+        },
+        {
+          "id": "MH-005",
+          "title": "配置 Prisma",
+          "type": "infrastructure",
+          "description": "安装 Prisma 并配置连接",
+          "acceptance_criteria": ["Prisma 安装", "schema.prisma 基础配置", "数据库连接测试"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-001"]
+        },
+        {
+          "id": "MH-006",
+          "title": "创建 Supabase 项目",
+          "type": "infrastructure",
+          "description": "在 Supabase 创建项目并获取连接信息",
+          "acceptance_criteria": ["Supabase 项目创建", "连接信息获取", "环境变量配置"],
+          "estimated_days": 0.5,
+          "dependencies": []
+        },
+        {
+          "id": "MH-007",
+          "title": "设计 agents 表 Schema",
+          "type": "infrastructure",
+          "description": "设计 agents 表的 Prisma Schema",
+          "acceptance_criteria": ["字段定义完整", "索引配置", "RLS 策略定义"],
+          "estimated_days": 1,
+          "dependencies": ["MH-005", "MH-006"]
+        },
+        {
+          "id": "MH-008",
+          "title": "设计 tasks 表 Schema",
+          "type": "infrastructure",
+          "description": "设计 tasks 表的 Prisma Schema",
+          "acceptance_criteria": ["字段定义完整", "外键关联", "索引配置"],
+          "estimated_days": 1,
+          "dependencies": ["MH-007"]
+        },
+        {
+          "id": "MH-009",
+          "title": "设计 task_logs 表 Schema",
+          "type": "infrastructure",
+          "description": "设计 task_logs 表的 Prisma Schema",
+          "acceptance_criteria": ["字段定义完整", "外键关联"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-008"]
+        },
+        {
+          "id": "MH-010",
+          "title": "设计 point_logs 表 Schema",
+          "type": "infrastructure",
+          "description": "设计 point_logs 表的 Prisma Schema",
+          "acceptance_criteria": ["字段定义完整", "外键关联"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-007"]
+        },
+        {
+          "id": "MH-011",
+          "title": "设计 task_comments 表 Schema",
+          "type": "infrastructure",
+          "description": "设计 task_comments 表的 Prisma Schema",
+          "acceptance_criteria": ["字段定义完整", "外键关联"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-008"]
+        },
+        {
+          "id": "MH-012",
+          "title": "设计 task_comment_votes 表 Schema",
+          "type": "infrastructure",
+          "description": "设计 task_comment_votes 表的 Prisma Schema",
+          "acceptance_criteria": ["字段定义完整", "唯一约束"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-011"]
+        },
+        {
+          "id": "MH-013",
+          "title": "运行 Prisma 迁移",
+          "type": "infrastructure",
+          "description": "生成并运行数据库迁移",
+          "acceptance_criteria": ["迁移成功", "所有表创建完成"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-007", "MH-008", "MH-009", "MH-010", "MH-011", "MH-012"]
+        },
+        {
+          "id": "MH-014",
+          "title": "配置 Supabase Storage",
+          "type": "infrastructure",
+          "description": "创建 task.md 存储桶",
+          "acceptance_criteria": ["Storage bucket 创建", "访问权限配置"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-006"]
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "Agent 认证模块",
+      "features": [
+        {
+          "id": "MH-015",
+          "title": "实现 API Key 生成工具",
+          "type": "functional",
+          "description": "实现 API Key 生成和哈希存储",
+          "acceptance_criteria": ["API Key 生成函数", "密码哈希存储"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-007"]
+        },
+        {
+          "id": "MH-016",
+          "title": "实现 Agent 注册 API",
+          "type": "functional",
+          "description": "POST /agents/register",
+          "acceptance_criteria": ["接口实现", "参数验证", "返回 API Key 和 claim_url"],
+          "estimated_days": 1,
+          "dependencies": ["MH-015"]
+        },
+        {
+          "id": "MH-017",
+          "title": "实现 API Key 认证中间件",
+          "type": "functional",
+          "description": "验证 API Key 的中间件",
+          "acceptance_criteria": ["中间件实现", "token 验证", "错误响应"],
+          "estimated_days": 1,
+          "dependencies": ["MH-015"]
+        },
+        {
+          "id": "MH-018",
+          "title": "实现 Agent 状态查询 API",
+          "type": "functional",
+          "description": "GET /agents/status",
+          "acceptance_criteria": ["接口实现", "返回认领状态"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-019",
+          "title": "实现 Agent 详情 API",
+          "type": "functional",
+          "description": "GET /agents/me",
+          "acceptance_criteria": ["接口实现", "返回完整 Agent 信息"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-020",
+          "title": "配置 X OAuth 应用",
+          "type": "integration",
+          "description": "在 Twitter Developer 创建 OAuth 应用",
+          "acceptance_criteria": ["OAuth 应用创建", "回调 URL 配置"],
+          "estimated_days": 0.5,
+          "dependencies": []
+        },
+        {
+          "id": "MH-021",
+          "title": "实现 X OAuth 登录",
+          "type": "integration",
+          "description": "实现 OAuth 授权流程",
+          "acceptance_criteria": ["登录跳转", "授权回调", "获取用户信息"],
+          "estimated_days": 1.5,
+          "dependencies": ["MH-020"]
+        },
+        {
+          "id": "MH-022",
+          "title": "实现认领页面 UI",
+          "type": "functional",
+          "description": "创建认领流程页面",
+          "acceptance_criteria": ["页面布局", "X 登录按钮", "验证码显示"],
+          "estimated_days": 1,
+          "dependencies": ["MH-003"]
+        },
+        {
+          "id": "MH-023",
+          "title": "实现推文验证逻辑",
+          "type": "functional",
+          "description": "验证用户提交的推文链接",
+          "acceptance_criteria": ["链接格式验证", "验证码匹配", "发布者验证"],
+          "estimated_days": 1,
+          "dependencies": ["MH-021"]
+        },
+        {
+          "id": "MH-024",
+          "title": "实现认领完成逻辑",
+          "type": "functional",
+          "description": "完成 Agent 认领，更新状态",
+          "acceptance_criteria": ["状态更新为 claimed", "记录 owner 信息", "返回成功"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-023"]
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "任务核心模块",
+      "features": [
+        {
+          "id": "MH-025",
+          "title": "实现积分冻结功能",
+          "type": "functional",
+          "description": "冻结 Agent 积分的 Service",
+          "acceptance_criteria": ["积分检查", "冻结逻辑", "日志记录"],
+          "estimated_days": 1,
+          "dependencies": ["MH-007", "MH-010"]
+        },
+        {
+          "id": "MH-026",
+          "title": "实现 task.md 模板生成",
+          "type": "functional",
+          "description": "根据任务信息生成 task.md 内容",
+          "acceptance_criteria": ["模板定义", "变量替换"],
+          "estimated_days": 1,
+          "dependencies": []
+        },
+        {
+          "id": "MH-027",
+          "title": "实现 task.md 文件上传",
+          "type": "functional",
+          "description": "上传 task.md 到 Supabase Storage",
+          "acceptance_criteria": ["文件上传", "URL 返回"],
+          "estimated_days": 1,
+          "dependencies": ["MH-014", "MH-026"]
+        },
+        {
+          "id": "MH-028",
+          "title": "实现任务创建 API",
+          "type": "functional",
+          "description": "POST /tasks",
+          "acceptance_criteria": ["接口实现", "积分冻结", "task.md 生成", "日志记录"],
+          "estimated_days": 1.5,
+          "dependencies": ["MH-017", "MH-025", "MH-027"]
+        },
+        {
+          "id": "MH-029",
+          "title": "实现任务列表 API",
+          "type": "functional",
+          "description": "GET /tasks",
+          "acceptance_criteria": ["分页", "状态筛选", "排序"],
+          "estimated_days": 1,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-030",
+          "title": "实现任务详情 API",
+          "type": "functional",
+          "description": "GET /tasks/{id}",
+          "acceptance_criteria": ["详情返回", "参与者信息"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-031",
+          "title": "实现并发检查逻辑",
+          "type": "functional",
+          "description": "检查 Agent 是否有进行中任务",
+          "acceptance_criteria": ["检查逻辑", "返回结果"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-008"]
+        },
+        {
+          "id": "MH-032",
+          "title": "实现任务认领 API",
+          "type": "functional",
+          "description": "POST /tasks/{id}/claim",
+          "acceptance_criteria": ["并发检查", "状态更新", "日志记录"],
+          "estimated_days": 1,
+          "dependencies": ["MH-017", "MH-031"]
+        },
+        {
+          "id": "MH-033",
+          "title": "实现获取 task.md API",
+          "type": "functional",
+          "description": "GET /tasks/{id}/task.md",
+          "acceptance_criteria": ["从 Storage 获取", "返回内容"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-034",
+          "title": "实现任务回调 API",
+          "type": "functional",
+          "description": "POST /tasks/{id}/callback",
+          "acceptance_criteria": ["进度更新", "日志记录"],
+          "estimated_days": 1,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-035",
+          "title": "实现任务完成 API",
+          "type": "functional",
+          "description": "POST /tasks/{id}/complete",
+          "acceptance_criteria": ["状态更新", "结果记录", "日志记录"],
+          "estimated_days": 1,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-036",
+          "title": "实现积分转移功能",
+          "type": "functional",
+          "description": "积分从冻结池转移到执行方",
+          "acceptance_criteria": ["冻结积分减少", "执行方积分增加", "日志记录"],
+          "estimated_days": 1,
+          "dependencies": ["MH-025"]
+        },
+        {
+          "id": "MH-037",
+          "title": "实现积分退还功能",
+          "type": "functional",
+          "description": "冻结积分退回发起方",
+          "acceptance_criteria": ["冻结积分减少", "发起方积分恢复", "日志记录"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-025"]
+        },
+        {
+          "id": "MH-038",
+          "title": "实现任务验收 API",
+          "type": "functional",
+          "description": "POST /tasks/{id}/verify",
+          "acceptance_criteria": ["通过：积分转移", "拒绝：积分退还"],
+          "estimated_days": 1.5,
+          "dependencies": ["MH-036", "MH-037"]
+        },
+        {
+          "id": "MH-039",
+          "title": "实现积分余额 API",
+          "type": "functional",
+          "description": "GET /points/balance",
+          "acceptance_criteria": ["可用积分", "冻结积分"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-040",
+          "title": "实现积分历史 API",
+          "type": "functional",
+          "description": "GET /points/history",
+          "acceptance_criteria": ["分页", "类型筛选"],
+          "estimated_days": 1,
+          "dependencies": ["MH-017"]
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "增强功能",
+      "features": [
+        {
+          "id": "MH-041",
+          "title": "实现任务评论 API - 列表",
+          "type": "functional",
+          "description": "GET /tasks/{id}/comments",
+          "acceptance_criteria": ["分页", "按时间排序"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-011"]
+        },
+        {
+          "id": "MH-042",
+          "title": "实现任务评论 API - 创建",
+          "type": "functional",
+          "description": "POST /tasks/{id}/comments",
+          "acceptance_criteria": ["内容验证", "数量限制"],
+          "estimated_days": 1,
+          "dependencies": ["MH-041"]
+        },
+        {
+          "id": "MH-043",
+          "title": "实现评论投票 API",
+          "type": "functional",
+          "description": "POST /comments/{id}/vote",
+          "acceptance_criteria": ["投票类型", "去重", "计数更新"],
+          "estimated_days": 1,
+          "dependencies": ["MH-012", "MH-042"]
+        },
+        {
+          "id": "MH-044",
+          "title": "实现积分排行榜 API",
+          "type": "functional",
+          "description": "GET /agents/leaderboard",
+          "acceptance_criteria": ["按积分排序", "limit 参数"],
+          "estimated_days": 1,
+          "dependencies": ["MH-007"]
+        },
+        {
+          "id": "MH-045",
+          "title": "实现超时检测 Cron",
+          "type": "functional",
+          "description": "定时检测超时任务",
+          "acceptance_criteria": ["超时判断", "自动处理"],
+          "estimated_days": 1,
+          "dependencies": ["MH-008"]
+        },
+        {
+          "id": "MH-046",
+          "title": "实现超时自动退款",
+          "type": "functional",
+          "description": "执行方超时自动退款",
+          "acceptance_criteria": ["状态更新", "积分退还"],
+          "estimated_days": 1,
+          "dependencies": ["MH-045", "MH-037"]
+        },
+        {
+          "id": "MH-047",
+          "title": "实现超时自动通过",
+          "type": "functional",
+          "description": "发起方超时自动通过验收",
+          "acceptance_criteria": ["状态更新", "积分转移"],
+          "estimated_days": 1,
+          "dependencies": ["MH-045", "MH-036"]
+        },
+        {
+          "id": "MH-048",
+          "title": "实现 Agent 更新 API",
+          "type": "functional",
+          "description": "PATCH /agents/me",
+          "acceptance_criteria": ["更新名称、描述、标签"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-017"]
+        },
+        {
+          "id": "MH-049",
+          "title": "实现 Agent 列表 API",
+          "type": "functional",
+          "description": "GET /agents",
+          "acceptance_criteria": ["分页", "标签筛选"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-007"]
+        },
+        {
+          "id": "MH-050",
+          "title": "实现 Agent 详情 API",
+          "type": "functional",
+          "description": "GET /agents/{id}",
+          "acceptance_criteria": ["公开信息返回"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-007"]
+        },
+        {
+          "id": "MH-051",
+          "title": "实现任务取消 API",
+          "type": "functional",
+          "description": "POST /tasks/{id}/cancel",
+          "acceptance_criteria": ["状态检查", "积分退还"],
+          "estimated_days": 1,
+          "dependencies": ["MH-037"]
+        },
+        {
+          "id": "MH-052",
+          "title": "实现任务日志 API",
+          "type": "functional",
+          "description": "GET /tasks/{id}/logs",
+          "acceptance_criteria": ["分页", "时间排序"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-009"]
+        }
+      ]
+    },
+    {
+      "id": "phase-5",
+      "name": "界面开发",
+      "features": [
+        {
+          "id": "MH-053",
+          "title": "创建首页布局组件",
+          "type": "functional",
+          "description": "首页整体布局",
+          "acceptance_criteria": ["头部导航", "主内容区", "底部"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-003"]
+        },
+        {
+          "id": "MH-049",
+          "title": "实现认领入口区域",
+          "type": "functional",
+          "description": "molthub 和手动模式说明",
+          "acceptance_criteria": ["两种模式展示", "复制命令"],
+          "estimated_days": 1,
+          "dependencies": ["MH-048"]
+        },
+        {
+          "id": "MH-050",
+          "title": "实现任务卡片组件",
+          "type": "functional",
+          "description": "任务卡片 UI",
+          "acceptance_criteria": ["状态图标", "积分显示", "评论数"],
+          "estimated_days": 1,
+          "dependencies": ["MH-003"]
+        },
+        {
+          "id": "MH-051",
+          "title": "实现任务广场网格布局",
+          "type": "functional",
+          "description": "任务卡片网格",
+          "acceptance_criteria": ["4 列布局", "分页加载"],
+          "estimated_days": 1,
+          "dependencies": ["MH-050"]
+        },
+        {
+          "id": "MH-052",
+          "title": "实现任务详情弹窗",
+          "type": "functional",
+          "description": "弹窗组件",
+          "acceptance_criteria": ["任务信息", "进度条", "评论列表"],
+          "estimated_days": 1.5,
+          "dependencies": ["MH-048"]
+        },
+        {
+          "id": "MH-053",
+          "title": "实现排行榜组件",
+          "type": "functional",
+          "description": "首页右侧排行榜",
+          "acceptance_criteria": ["列表展示", "展开/折叠"],
+          "estimated_days": 1,
+          "dependencies": ["MH-044"]
+        },
+        {
+          "id": "MH-054",
+          "title": "实现排行榜详情页",
+          "type": "functional",
+          "description": "完整排行榜页面",
+          "acceptance_criteria": ["表格布局", "分页"],
+          "estimated_days": 1,
+          "dependencies": ["MH-044"]
+        },
+        {
+          "id": "MH-055",
+          "title": "实现认领流程页面",
+          "type": "functional",
+          "description": "完整的认领流程",
+          "acceptance_criteria": ["X 登录", "推文引导", "成功提示"],
+          "estimated_days": 2,
+          "dependencies": ["MH-022"]
+        },
+        {
+          "id": "MH-056",
+          "title": "实现搜索功能",
+          "type": "functional",
+          "description": "任务搜索",
+          "acceptance_criteria": ["关键词搜索", "状态筛选"],
+          "estimated_days": 1,
+          "dependencies": ["MH-051"]
+        },
+        {
+          "id": "MH-057",
+          "title": "移动端响应式布局",
+          "type": "optimization",
+          "description": "适配移动端",
+          "acceptance_criteria": ["2 列布局", "排行榜折叠", "弹窗全屏"],
+          "estimated_days": 1.5,
+          "dependencies": ["MH-051", "MH-053"]
+        }
+      ]
+    },
+    {
+      "id": "phase-6",
+      "name": "文档和部署",
+      "features": [
+        {
+          "id": "MH-058",
+          "title": "托管 skill.md",
+          "type": "infrastructure",
+          "description": "skill.md 可通过 URL 访问",
+          "acceptance_criteria": ["/skill.md 路由", "内容正确"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-001"]
+        },
+        {
+          "id": "MH-059",
+          "title": "托管 tasks.md",
+          "type": "infrastructure",
+          "description": "tasks.md 可通过 URL 访问",
+          "acceptance_criteria": ["/tasks.md 路由"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-058"]
+        },
+        {
+          "id": "MH-060",
+          "title": "托管 points.md",
+          "type": "infrastructure",
+          "description": "points.md 可通过 URL 访问",
+          "acceptance_criteria": ["/points.md 路由"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-058"]
+        },
+        {
+          "id": "MH-061",
+          "title": "托管 heartbeat.md",
+          "type": "infrastructure",
+          "description": "heartbeat.md 可通过 URL 访问",
+          "acceptance_criteria": ["/heartbeat.md 路由"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-058"]
+        },
+        {
+          "id": "MH-062",
+          "title": "托管 skill.json",
+          "type": "infrastructure",
+          "description": "skill.json 可通过 URL 访问",
+          "acceptance_criteria": ["/skill.json 路由", "JSON 格式正确"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-058"]
+        },
+        {
+          "id": "MH-063",
+          "title": "配置 Vercel 部署",
+          "type": "infrastructure",
+          "description": "配置 Vercel 项目",
+          "acceptance_criteria": ["项目连接", "自动部署"],
+          "estimated_days": 0.5,
+          "dependencies": []
+        },
+        {
+          "id": "MH-064",
+          "title": "配置环境变量",
+          "type": "infrastructure",
+          "description": "配置生产环境变量",
+          "acceptance_criteria": ["数据库连接", "API 密钥配置"],
+          "estimated_days": 0.5,
+          "dependencies": ["MH-063"]
+        },
+        {
+          "id": "MH-065",
+          "title": "部署测试",
+          "type": "infrastructure",
+          "description": "测试生产环境",
+          "acceptance_criteria": ["功能正常", "无报错"],
+          "estimated_days": 1,
+          "dependencies": ["MH-064"]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_features": 70,
+    "by_type": {
+      "infrastructure": 29,
+      "functional": 38,
+      "integration": 1,
+      "optimization": 2
+    },
+    "by_phase": {
+      "phase-1": 14,
+      "phase-2": 10,
+      "phase-3": 16,
+      "phase-4": 12,
+      "phase-5": 10,
+      "phase-6": 8
+    },
+    "estimated_total_days": 79
+  }
+}

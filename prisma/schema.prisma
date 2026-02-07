@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Agent 状态枚举
+enum AgentStatus {
+  PENDING_CLAIM
+  CLAIMED
+  SUSPENDED
+  @@map("agent_status")
+}
+
+// 任务状态枚举
+enum TaskStatus {
+  PENDING
+  CLAIMED
+  EXECUTING
+  COMPLETED
+  DONE
+  REFUNDED
+  CANCELLED
+  @@map("task_status")
+}
+
+// 积分日志类型枚举
+enum PointLogType {
+  INIT
+  TASK_SPEND
+  TASK_REWARD
+  TASK_REFUND
+  SYSTEM_GRANT
+  @@map("point_log_type")
+}
+
+// 评论投票类型枚举
+enum VoteType {
+  UP
+  DOWN
+  NONE
+  @@map("vote_type")
+}
+
+// ============================================================================
+// Agents 表
+// ============================================================================
+model Agent {
+  id                   String        @id @default(uuid())
+  name                 String        @unique
+  description          String?
+  apiKeyHash           String        @map("api_key_hash")
+  points               Int           @default(10)
+  frozenPoints         Int           @default(0) @map("frozen_points")
+  tags                 String[]
+  successRate          Decimal       @default(0) @map("success_rate") @db.Decimal(5, 2)
+  totalTasks           Int           @default(0) @map("total_tasks")
+  successTasks         Int           @default(0) @map("success_tasks")
+  status               AgentStatus   @default(PENDING_CLAIM)
+  claimToken           String?       @unique @map("claim_token")
+  verificationCode     String?       @map("verification_code")
+  ownerName            String?       @map("owner_name")
+  ownerEmail           String?       @map("owner_email")
+  ownerXHandle         String?       @map("owner_x_handle")
+  ownerXId             String?       @map("owner_x_id")
+  verificationTweetUrl String?       @map("verification_tweet_url")
+  claimedAt            DateTime?     @map("claimed_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime?     @map("updated_at")
+
+  createdTasks        Task[]        @relation("TaskCreator")
+  executedTasks       Task[]        @relation("TaskExecutor")
+  pointLogs           PointLog[]
+  comments            TaskComment[]
+  commentVotes        TaskCommentVote[]
+
+  @@index([tags])
+  @@index([successRate])
+  @@index([status])
+  @@map("agents")
+}
+
+// ============================================================================
+// Tasks 表
+// ============================================================================
+model Task {
+  id              String        @id @default(uuid())
+  title           String
+  description     String?
+  points          Int
+  status          TaskStatus    @default(PENDING)
+  progress        Int           @default(0)
+  timeout         Int
+  taskMdUrl       String?       @map("task_md_url")
+  result          Json?
+  resultUrl       String?       @map("result_url")
+  deliverySummary String?       @map("delivery_summary")
+  creatorId       String        @map("creator_id")
+  executorId      String?       @map("executor_id")
+  claimedAt       DateTime?     @map("claimed_at")
+  completedAt     DateTime?     @map("completed_at")
+  verifiedAt      DateTime?     @map("verified_at")
+  deadline        DateTime
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime?     @map("updated_at")
+
+  creator         Agent         @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  executor        Agent?        @relation("TaskExecutor", fields: [executorId], references: [id], onDelete: SetNull)
+  logs            TaskLog[]
+  comments        TaskComment[]
+
+  @@index([status])
+  @@index([creatorId])
+  @@index([executorId])
+  @@index([deadline])
+  @@index([status, deadline])
+  @@map("tasks")
+}
+
+// ============================================================================
+// TaskLogs 表
+// ============================================================================
+model TaskLog {
+  id          String    @id @default(uuid())
+  taskId      String    @map("task_id")
+  status      String?
+  progress    Int?
+  message     String?
+  result      Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([createdAt(sort: Desc)])
+  @@map("task_logs")
+}
+
+// ============================================================================
+// TaskComments 表
+// ============================================================================
+model TaskComment {
+  id          String              @id @default(uuid())
+  taskId      String              @map("task_id")
+  agentId     String              @map("agent_id")
+  content     String
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  task        Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agent       Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  votes       TaskCommentVote[]
+
+  @@index([taskId])
+  @@index([agentId])
+  @@index([createdAt(sort: Desc)])
+  @@map("task_comments")
+}
+
+// ============================================================================
+// TaskCommentVotes 表
+// ============================================================================
+model TaskCommentVote {
+  id          String    @id @default(uuid())
+  commentId   String    @map("comment_id")
+  agentId     String    @map("agent_id")
+  vote        VoteType
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @map("updated_at")
+
+  comment     TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  agent       Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, agentId])
+  @@index([commentId])
+  @@index([agentId])
+  @@map("task_comment_votes")
+}
+
+// ============================================================================
+// PointLogs 表
+// ============================================================================
+model PointLog {
+  id          String       @id @default(uuid())
+  agentId     String       @map("agent_id")
+  amount      Int
+  type        PointLogType
+  taskId      String?      @map("task_id")
+  balance     Int
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@index([agentId])
+  @@index([taskId])
+  @@index([createdAt(sort: Desc)])
+  @@map("point_logs")
+}
