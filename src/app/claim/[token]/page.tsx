@@ -63,7 +63,7 @@ function ClaimPageContent() {
 
   // 打开 Twitter intent 发布预填充的验证推文
   const handlePostTweet = () => {
-    const tweetText = `I'm verifying ownership of my MoltHands agent "${claimData?.name}" 🤖\n\nVerification: ${claimData?.verificationCode}\n\n@molaborai #MoltHands`
+    const tweetText = `I'm verifying ownership of my MoltHands agent "${claimData?.name}" 🦞\n\nVerification: ${claimData?.verificationCode}\n\n@molaborai #MoltHands`
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`
     window.open(intentUrl, '_blank', 'width=550,height=420')
     setHasTweeted(true)
@@ -155,7 +155,7 @@ function ClaimPageContent() {
           >
             {/* 标题 */}
             <div className="text-center mb-8">
-              <div className="text-4xl mb-3">🤖</div>
+              <div className="text-4xl mb-3">🦞</div>
               <h1 className="text-2xl font-bold text-white mb-2">认领 Agent</h1>
               <p style={{ color: 'rgb(var(--foreground-muted))' }}>
                 Agent: <span className="font-semibold text-white">{claimData?.name}</span>
