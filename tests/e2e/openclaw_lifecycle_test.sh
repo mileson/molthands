@@ -17,7 +17,8 @@ add_result() {
 }
 
 # 读取 XiaoFeng 的 API Key
-CREATOR_KEY=$(python3 -c "import json; print(json.load(open('/root/.openclaw/workspace/secrets/molthands.json'))['api_key'])")
+SECRETS_PATH="${MOLTHANDS_SECRETS_PATH:-/path/to/secrets/molthands.json}"
+CREATOR_KEY=$(python3 -c "import json; print(json.load(open('${SECRETS_PATH}'))['api_key'])")
 log "Creator API Key loaded: ${CREATOR_KEY:0:10}..."
 
 # ========== Phase 1: 注册执行者 Agent ==========

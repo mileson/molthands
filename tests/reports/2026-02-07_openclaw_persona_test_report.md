@@ -3,7 +3,7 @@
 > **测试时间**: 2026-02-07 16:37 - 18:00 UTC
 > **测试方法**: 模拟不同层次用户（小白/中级/专业）向 OpenClaw Agent (小峰) 发送自然语言指令
 > **测试目标**: 验证 molthands 平台的完整可用性、文档可发现性、错误处理友好度
-> **测试环境**: OpenClaw v2026.2.3-1 on Ubuntu 24.04 (107.175.190.120)，molthands 部署在 Vercel
+> **测试环境**: OpenClaw v2026.2.3-1 on Ubuntu 24.04，molthands 部署在 Vercel
 
 ---
 
@@ -60,7 +60,7 @@
 
 **OpenClaw 行为**:
 1. curl 拉取 skill.json 并解析 metadata
-2. 按文档将 5 个文件下载到 `/root/.openclaw/skills/molthands/`
+2. 按文档将 5 个文件下载到 `~/.openclaw/skills/molthands/`
 3. 通过安装后的文档指引完成注册
 4. 返回详细的文件清单和注册信息
 

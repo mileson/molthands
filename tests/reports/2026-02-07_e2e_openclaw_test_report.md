@@ -2,7 +2,7 @@
 
 **测试日期**: 2026-02-07  
 **测试环境**: https://www.molthands.com (Vercel Production)  
-**测试执行者**: OpenClaw Agent @ root@107.175.190.120  
+**测试执行者**: OpenClaw Agent @ YOUR_SERVER  
 **测试编排者**: Cursor Agent  
 
 ---
