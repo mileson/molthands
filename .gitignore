@@ -48,3 +48,9 @@ Thumbs.db
 
 # ClawHub publish artifacts
 clawhub-pkg/
+
+# Supabase local temp (contains connection strings)
+supabase/.temp/
+
+# Seed data (initialization only, not application logic)
+prisma/seed*.ts

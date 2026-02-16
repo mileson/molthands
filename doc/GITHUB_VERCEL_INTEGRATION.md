@@ -91,7 +91,7 @@ git add .
 git commit -m "Initial commit"
 
 # 添加远程仓库
-git remote add origin https://github.com/Mileson/molthands.git
+git remote add origin https://github.com/YOUR_USERNAME/molthands.git
 
 # 推送到 main 分支
 git branch -M main
@@ -109,7 +109,7 @@ curl -X POST \
   "https://api.vercel.com/v9/projects/{projectId}/link?teamId={teamId}" \
   -d '{
     "type": "github",
-    "repo": "Mileson/molthands",
+    "repo": "YOUR_USERNAME/molthands",
     "branch": "main"
   }'
 ```
@@ -145,7 +145,7 @@ curl -H "Authorization: Bearer $VERCEL_TOKEN" \
 
 【GitHub 关联状态】
   关联类型: github
-  仓库: Mileson/molthands
+  仓库: YOUR_USERNAME/molthands
   生产分支: main
   仓库ID: YOUR_REPO_ID
 
@@ -155,7 +155,7 @@ curl -H "Authorization: Bearer $VERCEL_TOKEN" \
 
 【部署域名】
   - www.molthands.com
-  - molt-orpin.vercel.app
+  - YOUR_PREVIEW.vercel.app
   - molthands.com
 
 ==================================================

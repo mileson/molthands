@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'REDACTED_DEFAULT_PASSWORD'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
+if (!ADMIN_PASSWORD) {
+  console.error('ADMIN_PASSWORD environment variable is required')
+}
 
 export async function POST(request: NextRequest) {
   try {
