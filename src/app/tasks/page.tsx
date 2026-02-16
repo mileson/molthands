@@ -13,61 +13,58 @@ import { detectCategory } from '@/lib/task-utils'
 
 // ── Data fetching ──
 
+// unstable_cache 内不 catch 错误 — 让失败请求不被缓存，下次请求自动重试
 function getTasksData(status?: string, search?: string, page?: string) {
   return unstable_cache(
     async () => {
-      try {
-        const pageNum = parseInt(page || '1')
-        const limit = 12
+      const pageNum = parseInt(page || '1')
+      const limit = 12
 
-        const where: Prisma.TaskWhereInput = {
-          ...(status && status !== 'ALL' && { status: status as TaskStatus }),
-          ...(search && {
-            OR: [
-              { title: { contains: search, mode: 'insensitive' as const } },
-              { description: { contains: search, mode: 'insensitive' as const } },
-            ],
-          }),
-        }
+      const where: Prisma.TaskWhereInput = {
+        ...(status && status !== 'ALL' && { status: status as TaskStatus }),
+        ...(search && {
+          OR: [
+            { title: { contains: search, mode: 'insensitive' as const } },
+            { description: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }),
+      }
 
-        const [tasks, total] = await Promise.all([
-          prisma.task.findMany({
-            where,
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              points: true,
-              progress: true,
-              deadline: true,
-              createdAt: true,
-              deliveryMethod: true,
-              executor: { select: { name: true } },
-              creator: { select: { name: true } },
-              _count: { select: { comments: true } },
-            },
-            orderBy: { createdAt: 'desc' },
-            skip: (pageNum - 1) * limit,
-            take: limit,
-          }),
-          prisma.task.count({ where }),
-        ])
+      const [tasks, total] = await Promise.all([
+        prisma.task.findMany({
+          where,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            points: true,
+            progress: true,
+            deadline: true,
+            createdAt: true,
+            deliveryMethod: true,
+            executor: { select: { name: true } },
+            creator: { select: { name: true } },
+            _count: { select: { comments: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: (pageNum - 1) * limit,
+          take: limit,
+        }),
+        prisma.task.count({ where }),
+      ])
 
-        return {
-          tasks: tasks.map(t => ({
-            ...t,
-            deadline: t.deadline.toISOString(),
-            executorName: t.executor?.name ?? null,
-            creatorName: t.creator?.name ?? null,
-            commentCount: t._count?.comments ?? 0,
-            createdAt: t.createdAt.toISOString(),
-            deliveryMethod: t.deliveryMethod,
-          })),
-          total,
-          totalPages: Math.ceil(total / limit),
-        }
-      } catch {
-        return { tasks: [], total: 0, totalPages: 0 }
+      return {
+        tasks: tasks.map(t => ({
+          ...t,
+          deadline: t.deadline.toISOString(),
+          executorName: t.executor?.name ?? null,
+          creatorName: t.creator?.name ?? null,
+          commentCount: t._count?.comments ?? 0,
+          createdAt: t.createdAt.toISOString(),
+          deliveryMethod: t.deliveryMethod,
+        })),
+        total,
+        totalPages: Math.ceil(total / limit),
       }
     },
     ['tasks-data', status || 'ALL', search || '', page || '1'],
@@ -77,27 +74,23 @@ function getTasksData(status?: string, search?: string, page?: string) {
 
 const getStatusCounts = unstable_cache(
   async () => {
-    try {
-      const groups = await prisma.task.groupBy({
-        by: ['status'],
-        _count: { status: true },
-      })
-      const counts = { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
-      for (const g of groups) {
-        const c = g._count.status
-        counts.total += c
-        switch (g.status) {
-          case 'PENDING': counts.pending = c; break
-          case 'CLAIMED': counts.claimed = c; break
-          case 'EXECUTING': counts.executing = c; break
-          case 'COMPLETED': counts.completed = c; break
-          case 'DONE': counts.done = c; break
-        }
+    const groups = await prisma.task.groupBy({
+      by: ['status'],
+      _count: { status: true },
+    })
+    const counts = { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
+    for (const g of groups) {
+      const c = g._count.status
+      counts.total += c
+      switch (g.status) {
+        case 'PENDING': counts.pending = c; break
+        case 'CLAIMED': counts.claimed = c; break
+        case 'EXECUTING': counts.executing = c; break
+        case 'COMPLETED': counts.completed = c; break
+        case 'DONE': counts.done = c; break
       }
-      return counts
-    } catch {
-      return { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
     }
+    return counts
   },
   ['status-counts'],
   { revalidate: 30 }
@@ -105,19 +98,15 @@ const getStatusCounts = unstable_cache(
 
 const getExecutingTasks = unstable_cache(
   async () => {
-    try {
-      return await prisma.task.findMany({
-        where: { status: 'EXECUTING' },
-        include: {
-          executor: { select: { name: true } },
-          _count: { select: { comments: true } },
-        },
-        orderBy: { claimedAt: 'desc' },
-        take: 6,
-      })
-    } catch {
-      return []
-    }
+    return await prisma.task.findMany({
+      where: { status: 'EXECUTING' },
+      include: {
+        executor: { select: { name: true } },
+        _count: { select: { comments: true } },
+      },
+      orderBy: { claimedAt: 'desc' },
+      take: 6,
+    })
   },
   ['executing-tasks'],
   { revalidate: 30 }
@@ -125,45 +114,41 @@ const getExecutingTasks = unstable_cache(
 
 const getActivityFeed = unstable_cache(
   async (): Promise<ActivityItem[]> => {
-    try {
-      const recentLogs = await prisma.taskLog.findMany({
-        select: {
-          id: true,
-          status: true,
-          progress: true,
-          task: {
-            select: {
-              title: true,
-              executor: { select: { name: true } },
-              creator: { select: { name: true } },
-            },
+    const recentLogs = await prisma.taskLog.findMany({
+      select: {
+        id: true,
+        status: true,
+        progress: true,
+        task: {
+          select: {
+            title: true,
+            executor: { select: { name: true } },
+            creator: { select: { name: true } },
           },
         },
-        orderBy: { createdAt: 'desc' },
-        take: 12,
-      })
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    })
 
-      return recentLogs.map((log) => {
-        const agentName = log.task.executor?.name || log.task.creator?.name || 'Agent'
-        let type: ActivityItem['type'] = 'executing'
-        let detail: string | undefined
+    return recentLogs.map((log) => {
+      const agentName = log.task.executor?.name || log.task.creator?.name || 'Agent'
+      let type: ActivityItem['type'] = 'executing'
+      let detail: string | undefined
 
-        if (log.status === 'COMPLETED' || log.status === 'DONE') {
-          type = 'completed'
-        } else if (log.status === 'CLAIMED') {
-          type = 'claimed'
-        } else if (log.status === 'EXECUTING') {
-          type = 'executing'
-          if (log.progress) detail = `${log.progress}%`
-        } else if (log.status === 'PENDING') {
-          type = 'posted'
-        }
+      if (log.status === 'COMPLETED' || log.status === 'DONE') {
+        type = 'completed'
+      } else if (log.status === 'CLAIMED') {
+        type = 'claimed'
+      } else if (log.status === 'EXECUTING') {
+        type = 'executing'
+        if (log.progress) detail = `${log.progress}%`
+      } else if (log.status === 'PENDING') {
+        type = 'posted'
+      }
 
-        return { id: log.id, type, agentName, taskTitle: log.task.title, detail }
-      })
-    } catch {
-      return []
-    }
+      return { id: log.id, type, agentName, taskTitle: log.task.title, detail }
+    })
   },
   ['activity-feed'],
   { revalidate: 30 }
@@ -189,12 +174,14 @@ async function TasksContent({
 }: {
   params: { status?: string; search?: string; page?: string }
 }) {
-  const [{ tasks, total, totalPages }, statusCounts, executingTasks, activityFeed] = await Promise.all([
-    getTasksData(params.status, params.search, params.page),
-    getStatusCounts(),
-    getExecutingTasks(),
-    getActivityFeed(),
+  // 组件层容错 — 单个查询失败不影响其他数据展示
+  const [tasksResult, statusCounts, executingTasks, activityFeed] = await Promise.all([
+    getTasksData(params.status, params.search, params.page).catch(() => ({ tasks: [] as ReturnType<typeof getTasksData> extends Promise<infer T> ? T['tasks'] : never, total: 0, totalPages: 0 })),
+    getStatusCounts().catch(() => ({ pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 })),
+    getExecutingTasks().catch(() => [] as Awaited<ReturnType<typeof getExecutingTasks>>),
+    getActivityFeed().catch(() => [] as ActivityItem[]),
   ])
+  const { tasks, total, totalPages } = tasksResult
   const currentPage = parseInt(params.page || '1')
   const activeStatus = params.status || 'ALL'
   const showExecutingSection = activeStatus === 'ALL' || activeStatus === 'EXECUTING'
