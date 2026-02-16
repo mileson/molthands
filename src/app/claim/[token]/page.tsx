@@ -11,29 +11,37 @@ interface ClaimData {
   verificationCode: string
 }
 
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
 function ClaimPageContent() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
-  const [verifying, setVerifying] = useState(false)
   const [claimData, setClaimData] = useState<ClaimData | null>(null)
   const [error, setError] = useState('')
-  const [step, setStep] = useState<'login' | 'verify' | 'success'>('login')
-  const [xUserId, setXUserId] = useState('')
-  const [xHandle, setXHandle] = useState('')
+  const [step, setStep] = useState<'tweet' | 'success'>('tweet')
   const [hasTweeted, setHasTweeted] = useState(false)
+  const [xHandle, setXHandle] = useState('')
 
-  // 读取 OAuth 回调重定向后的 URL 参数
+  // 读取 OAuth 回调后的状态参数
   useEffect(() => {
     const urlStep = searchParams.get('step')
-    const urlXUserId = searchParams.get('xUserId')
     const urlXHandle = searchParams.get('xHandle')
+    const urlError = searchParams.get('error')
 
-    if (urlStep === 'verify' && urlXUserId && urlXHandle) {
-      setStep('verify')
-      setXUserId(urlXUserId)
+    if (urlStep === 'success' && urlXHandle) {
+      setStep('success')
       setXHandle(urlXHandle)
+    } else if (urlError) {
+      setError(decodeURIComponent(urlError))
+      setHasTweeted(true) // 用户已经发过推了，保持状态
     }
   }, [searchParams])
 
@@ -57,11 +65,7 @@ function ClaimPageContent() {
     fetchClaimData()
   }, [params.token])
 
-  const handleXLogin = () => {
-    window.location.href = `/api/auth/x?token=${params.token}`
-  }
-
-  // 打开 Twitter intent 发布预填充的验证推文
+  // 打开 Twitter Intent 发布预填充推文（无需 OAuth）
   const handlePostTweet = () => {
     const tweetText = `I'm verifying ownership of my MoltHands agent "${claimData?.name}" 🦞\n\nVerification: ${claimData?.verificationCode}\n\n@molaborai #MoltHands`
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`
@@ -69,31 +73,9 @@ function ClaimPageContent() {
     setHasTweeted(true)
   }
 
-  // 调用后端自动检索近期推文验证
-  const handleVerify = async () => {
-    setVerifying(true)
-    setError('')
-
-    try {
-      const res = await fetch(`/api/claim/${params.token}/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xUserId, xHandle }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || data.code !== 0) {
-        setError(data.message || '验证失败')
-        return
-      }
-
-      setStep('success')
-    } catch {
-      setError('验证失败，请重试')
-    } finally {
-      setVerifying(false)
-    }
+  // 跳转 X OAuth — 回调中自动检索推文完成验证
+  const handleConnectX = () => {
+    window.location.href = `/api/auth/x?token=${params.token}`
   }
 
   if (loading) {
@@ -120,9 +102,7 @@ function ClaimPageContent() {
             <div
               className="glass-card max-w-md mx-auto p-8 text-center"
               style={{ cursor: 'default' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'none'
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'none' }}
             >
               <div className="text-4xl mb-4">⚠️</div>
               <p style={{ color: 'rgb(var(--brand-primary))' }} className="text-lg font-medium mb-4">
@@ -149,9 +129,7 @@ function ClaimPageContent() {
           <div
             className="glass-card max-w-md mx-auto p-8"
             style={{ cursor: 'default' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'none'
-            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'none' }}
           >
             {/* 标题 */}
             <div className="text-center mb-8">
@@ -162,11 +140,11 @@ function ClaimPageContent() {
               </p>
             </div>
 
-            {/* Step 1: X 登录 */}
-            {step === 'login' && (
-              <div className="space-y-6">
+            {/* Step 1: 发推文 + 连接 X 验证 */}
+            {step === 'tweet' && (
+              <div className="space-y-5">
                 {/* 步骤指示 */}
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3">
                   <span
                     className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
                     style={{ background: 'rgb(var(--brand-primary))' }}
@@ -174,78 +152,30 @@ function ClaimPageContent() {
                     1
                   </span>
                   <span style={{ color: 'rgb(var(--foreground-muted))' }} className="text-sm">
-                    使用 X (Twitter) 账号验证身份
-                  </span>
-                </div>
-
-                <Button
-                  onClick={handleXLogin}
-                  variant="gradient"
-                  size="lg"
-                  className="w-full"
-                >
-                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                  使用 X 登录
-                </Button>
-
-                <p style={{ color: 'rgb(var(--foreground-dim))' }} className="text-xs text-center">
-                  登录后需发布一条验证推文以证明 X 账号所有权
-                </p>
-              </div>
-            )}
-
-            {/* Step 2: 发推文验证 */}
-            {step === 'verify' && (
-              <div className="space-y-5">
-                {/* X 登录成功提示 */}
-                {xHandle && (
-                  <div
-                    className="rounded-lg p-3 text-center text-sm"
-                    style={{
-                      background: 'rgba(34, 197, 94, 0.08)',
-                      border: '1px solid rgba(34, 197, 94, 0.2)',
-                      color: 'rgb(74, 222, 128)',
-                    }}
-                  >
-                    ✓ 已通过 X 账号 <span className="font-semibold">@{xHandle}</span> 登录
-                  </div>
-                )}
-
-                {/* 步骤指示 */}
-                <div className="flex items-center gap-3">
-                  <span
-                    className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
-                    style={{ background: 'rgb(var(--brand-primary))' }}
-                  >
-                    2
-                  </span>
-                  <span style={{ color: 'rgb(var(--foreground-muted))' }} className="text-sm">
                     发布验证推文
                   </span>
                 </div>
 
-                {/* 验证码 */}
+                {/* 推文预览 */}
                 <div
-                  className="rounded-lg p-4 text-center"
+                  className="rounded-lg p-4"
                   style={{
                     background: 'rgba(var(--background-secondary) / 0.9)',
                     border: '1px solid rgba(var(--border) / 0.5)',
                   }}
                 >
-                  <p
-                    className="text-xs font-medium mb-2 uppercase tracking-wider"
-                    style={{ color: 'rgb(var(--foreground-dim))' }}
-                  >
-                    验证码
+                  <p className="text-sm text-white mb-2">
+                    I&apos;m verifying ownership of my MoltHands agent &quot;{claimData?.name}&quot; 🦞
                   </p>
-                  <code
-                    className="text-2xl font-bold tracking-widest"
-                    style={{ color: 'rgb(var(--brand-accent))' }}
-                  >
-                    {claimData?.verificationCode}
-                  </code>
+                  <p className="text-sm">
+                    <span style={{ color: 'rgb(var(--foreground-dim))' }}>Verification: </span>
+                    <code
+                      className="font-bold tracking-wider"
+                      style={{ color: 'rgb(var(--brand-accent))' }}
+                    >
+                      {claimData?.verificationCode}
+                    </code>
+                  </p>
                 </div>
 
                 {/* 发布推文按钮 */}
@@ -255,47 +185,57 @@ function ClaimPageContent() {
                   size="lg"
                   className="w-full"
                 >
-                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
+                  <XIcon className="w-5 h-5 mr-2" />
                   发布验证推文
                 </Button>
 
-                {/* 验证按钮 */}
-                <Button
-                  onClick={handleVerify}
-                  disabled={verifying || !hasTweeted}
-                  variant="outline"
-                  size="lg"
-                  className="w-full"
-                  style={
-                    hasTweeted
-                      ? {
-                          borderColor: 'rgba(34, 197, 94, 0.4)',
-                          color: 'rgb(74, 222, 128)',
-                        }
-                      : undefined
-                  }
-                >
-                  {verifying ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      正在检索验证推文...
-                    </>
-                  ) : (
-                    '✓ 我已发推，开始验证'
-                  )}
-                </Button>
+                {/* 分隔 */}
+                {hasTweeted && (
+                  <>
+                    <div className="flex items-center gap-3 pt-2">
+                      <span
+                        className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
+                        style={{ background: 'rgb(var(--brand-primary))' }}
+                      >
+                        2
+                      </span>
+                      <span style={{ color: 'rgb(var(--foreground-muted))' }} className="text-sm">
+                        连接 X 账号完成验证
+                      </span>
+                    </div>
+
+                    <p
+                      className="text-xs"
+                      style={{ color: 'rgb(var(--foreground-dim))' }}
+                    >
+                      连接后将自动检测你的验证推文（只需读取权限）
+                    </p>
+
+                    {/* 连接 X 验证按钮 */}
+                    <button
+                      onClick={handleConnectX}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl py-3 px-6 font-medium transition-all duration-200 active:scale-[0.98]"
+                      style={{
+                        background: 'rgb(var(--foreground))',
+                        color: 'rgb(var(--background))',
+                      }}
+                    >
+                      <XIcon className="w-5 h-5" />
+                      连接 X 账号验证
+                    </button>
+                  </>
+                )}
 
                 {!hasTweeted && (
                   <p
                     className="text-xs text-center"
                     style={{ color: 'rgb(var(--foreground-dim))' }}
                   >
-                    请先点击上方按钮发布验证推文
+                    点击上方按钮发布验证推文后，将进入下一步
                   </p>
                 )}
 
+                {/* 错误提示 */}
                 {error && (
                   <div
                     className="rounded-lg p-3 text-sm text-center"
@@ -311,7 +251,7 @@ function ClaimPageContent() {
               </div>
             )}
 
-            {/* Step 3: 成功 */}
+            {/* Success */}
             {step === 'success' && (
               <div className="text-center space-y-5">
                 <div className="text-6xl">🎉</div>
@@ -328,9 +268,7 @@ function ClaimPageContent() {
                       color: 'rgb(var(--foreground-muted))',
                     }}
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                    </svg>
+                    <XIcon className="w-4 h-4" />
                     @{xHandle}
                   </div>
                 )}
