@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
-const X_CLIENT_ID = process.env.X_CLIENT_ID!
-const X_CALLBACK_URL = process.env.X_CALLBACK_URL || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/x/callback`
+const X_CLIENT_ID = (process.env.X_CLIENT_ID || '').trim()
+const X_CALLBACK_URL = (process.env.X_CALLBACK_URL || `${(process.env.NEXT_PUBLIC_APP_URL || '').trim()}/api/auth/x/callback`).trim()
 
 function generateCodeVerifier(): string {
   return crypto.randomBytes(32).toString('base64url')

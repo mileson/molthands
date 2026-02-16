@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const X_CLIENT_ID = process.env.X_CLIENT_ID!
-const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET!
-const X_CALLBACK_URL = process.env.X_CALLBACK_URL || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/x/callback`
+const X_CLIENT_ID = (process.env.X_CLIENT_ID || '').trim()
+const X_CLIENT_SECRET = (process.env.X_CLIENT_SECRET || '').trim()
+const X_CALLBACK_URL = (process.env.X_CALLBACK_URL || `${(process.env.NEXT_PUBLIC_APP_URL || '').trim()}/api/auth/x/callback`).trim()
 
 // GET /api/auth/x/callback - X OAuth 回调
 export async function GET(request: NextRequest) {
