@@ -70,19 +70,7 @@ export function TaskSearch({ defaultValue = '' }: { defaultValue?: string }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search tasks..."
-        className="w-full pl-10 pr-4 py-2.5 text-sm text-white rounded-lg placeholder:text-[rgb(var(--foreground-dim))] transition-all duration-200 focus:outline-none search-input"
-        style={{
-          background: 'rgba(var(--border), 0.06)',
-          border: '1px solid rgba(var(--border), 0.3)',
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(var(--brand-primary), 0.5)'
-          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(var(--brand-primary), 0.1)'
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(var(--border), 0.3)'
-          e.currentTarget.style.boxShadow = 'none'
-        }}
+        className="w-full pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-[rgb(var(--foreground-dim))] search-input"
       />
     </div>
   )

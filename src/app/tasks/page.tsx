@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { unstable_cache } from 'next/cache'
 import { Header } from '@/components/header'
-import { TaskRow } from '@/components/task-row'
 import { TaskCard } from '@/components/task-card'
 import { TaskSearch } from '@/components/task-search'
 import { ActivityTicker, type ActivityItem } from '@/components/activity-ticker'
@@ -13,125 +13,161 @@ import { detectCategory } from '@/lib/task-utils'
 
 // ── Data fetching ──
 
-async function getTasksData(searchParams: { status?: string; search?: string; page?: string }) {
-  try {
-    const { status, search, page = '1' } = searchParams
-    const pageNum = parseInt(page)
-    const limit = 12
+function getTasksData(status?: string, search?: string, page?: string) {
+  return unstable_cache(
+    async () => {
+      try {
+        const pageNum = parseInt(page || '1')
+        const limit = 12
 
-    const where: Prisma.TaskWhereInput = {
-      ...(status && status !== 'ALL' && { status: status as TaskStatus }),
-      ...(search && {
-        OR: [
-          { title: { contains: search } },
-          { description: { contains: search } },
-        ],
-      }),
+        const where: Prisma.TaskWhereInput = {
+          ...(status && status !== 'ALL' && { status: status as TaskStatus }),
+          ...(search && {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' as const } },
+              { description: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }),
+        }
+
+        const [tasks, total] = await Promise.all([
+          prisma.task.findMany({
+            where,
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              points: true,
+              progress: true,
+              deadline: true,
+              createdAt: true,
+              deliveryMethod: true,
+              executor: { select: { name: true } },
+              creator: { select: { name: true } },
+              _count: { select: { comments: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            skip: (pageNum - 1) * limit,
+            take: limit,
+          }),
+          prisma.task.count({ where }),
+        ])
+
+        return {
+          tasks: tasks.map(t => ({
+            ...t,
+            deadline: t.deadline.toISOString(),
+            executorName: t.executor?.name ?? null,
+            creatorName: t.creator?.name ?? null,
+            commentCount: t._count?.comments ?? 0,
+            createdAt: t.createdAt.toISOString(),
+            deliveryMethod: t.deliveryMethod,
+          })),
+          total,
+          totalPages: Math.ceil(total / limit),
+        }
+      } catch {
+        return { tasks: [], total: 0, totalPages: 0 }
+      }
+    },
+    ['tasks-data', status || 'ALL', search || '', page || '1'],
+    { revalidate: 60 }
+  )()
+}
+
+const getStatusCounts = unstable_cache(
+  async () => {
+    try {
+      const groups = await prisma.task.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      })
+      const counts = { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
+      for (const g of groups) {
+        const c = g._count.status
+        counts.total += c
+        switch (g.status) {
+          case 'PENDING': counts.pending = c; break
+          case 'CLAIMED': counts.claimed = c; break
+          case 'EXECUTING': counts.executing = c; break
+          case 'COMPLETED': counts.completed = c; break
+          case 'DONE': counts.done = c; break
+        }
+      }
+      return counts
+    } catch {
+      return { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
     }
+  },
+  ['status-counts'],
+  { revalidate: 30 }
+)
 
-    const [tasks, total] = await Promise.all([
-      prisma.task.findMany({
-        where,
+const getExecutingTasks = unstable_cache(
+  async () => {
+    try {
+      return await prisma.task.findMany({
+        where: { status: 'EXECUTING' },
         include: {
           executor: { select: { name: true } },
-          creator: { select: { name: true } },
           _count: { select: { comments: true } },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (pageNum - 1) * limit,
-        take: limit,
-      }),
-      prisma.task.count({ where }),
-    ])
-
-    return {
-      tasks: tasks.map(t => ({
-        ...t,
-        deadline: t.deadline.toISOString(),
-        executorName: t.executor?.name ?? null,
-        creatorName: t.creator?.name ?? null,
-        commentCount: t._count?.comments ?? 0,
-        createdAt: t.createdAt.toISOString(),
-        deliveryMethod: t.deliveryMethod,
-      })),
-      total,
-      totalPages: Math.ceil(total / limit),
+        orderBy: { claimedAt: 'desc' },
+        take: 6,
+      })
+    } catch {
+      return []
     }
-  } catch {
-    return { tasks: [], total: 0, totalPages: 0 }
-  }
-}
+  },
+  ['executing-tasks'],
+  { revalidate: 30 }
+)
 
-async function getStatusCounts() {
-  try {
-    const [pending, claimed, executing, completed, done, total] = await Promise.all([
-      prisma.task.count({ where: { status: 'PENDING' } }),
-      prisma.task.count({ where: { status: 'CLAIMED' } }),
-      prisma.task.count({ where: { status: 'EXECUTING' } }),
-      prisma.task.count({ where: { status: 'COMPLETED' } }),
-      prisma.task.count({ where: { status: 'DONE' } }),
-      prisma.task.count(),
-    ])
-    return { pending, claimed, executing, completed, done, total }
-  } catch {
-    return { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
-  }
-}
-
-async function getExecutingTasks() {
-  try {
-    return await prisma.task.findMany({
-      where: { status: 'EXECUTING' },
-      include: {
-        executor: { select: { name: true } },
-        _count: { select: { comments: true } },
-      },
-      orderBy: { claimedAt: 'desc' },
-      take: 6,
-    })
-  } catch {
-    return []
-  }
-}
-
-async function getActivityFeed(): Promise<ActivityItem[]> {
-  try {
-    const recentLogs = await prisma.taskLog.findMany({
-      include: {
-        task: {
-          select: {
-            title: true,
-            executor: { select: { name: true } },
-            creator: { select: { name: true } },
+const getActivityFeed = unstable_cache(
+  async (): Promise<ActivityItem[]> => {
+    try {
+      const recentLogs = await prisma.taskLog.findMany({
+        select: {
+          id: true,
+          status: true,
+          progress: true,
+          task: {
+            select: {
+              title: true,
+              executor: { select: { name: true } },
+              creator: { select: { name: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 12,
-    })
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+      })
 
-    return recentLogs.map((log) => {
-      const agentName = log.task.executor?.name || log.task.creator?.name || 'Agent'
-      let type: ActivityItem['type'] = 'executing'
-      let detail: string | undefined
+      return recentLogs.map((log) => {
+        const agentName = log.task.executor?.name || log.task.creator?.name || 'Agent'
+        let type: ActivityItem['type'] = 'executing'
+        let detail: string | undefined
 
-      if (log.status === 'COMPLETED' || log.status === 'DONE') {
-        type = 'completed'
-      } else if (log.status === 'CLAIMED') {
-        type = 'claimed'
-      } else if (log.status === 'EXECUTING') {
-        type = 'executing'
-        if (log.progress) detail = `${log.progress}%`
-      } else if (log.status === 'PENDING') {
-        type = 'posted'
-      }
+        if (log.status === 'COMPLETED' || log.status === 'DONE') {
+          type = 'completed'
+        } else if (log.status === 'CLAIMED') {
+          type = 'claimed'
+        } else if (log.status === 'EXECUTING') {
+          type = 'executing'
+          if (log.progress) detail = `${log.progress}%`
+        } else if (log.status === 'PENDING') {
+          type = 'posted'
+        }
 
-      return { id: log.id, type, agentName, taskTitle: log.task.title, detail }
-    })
-  } catch {
-    return []
-  }
-}
+        return { id: log.id, type, agentName, taskTitle: log.task.title, detail }
+      })
+    } catch {
+      return []
+    }
+  },
+  ['activity-feed'],
+  { revalidate: 30 }
+)
 
 // ── Status filter config ──
 
@@ -204,8 +240,7 @@ export default async function TasksPage({
           <div className="flex flex-col md:flex-row gap-3 mb-6">
             <Suspense fallback={
               <div className="relative flex-1 max-w-md">
-                <div className="w-full pl-10 pr-4 py-2.5 text-sm h-[42px]"
-                  style={{ background: 'transparent', borderBottom: '1px solid rgba(var(--border), 0.25)' }} />
+                <div className="w-full pl-10 pr-4 py-2.5 text-sm h-[42px] search-input" />
               </div>
             }>
               <TaskSearch defaultValue={params.search || ''} />
@@ -222,7 +257,7 @@ export default async function TasksPage({
                   : key === 'DONE' ? statusCounts.done
                   : null
                 return (
-                  <a
+                  <Link
                     key={key}
                     href={`/tasks?status=${key}${params.search ? `&search=${params.search}` : ''}`}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer border ${
@@ -242,7 +277,7 @@ export default async function TasksPage({
                         {count}
                       </span>
                     )}
-                  </a>
+                  </Link>
                 )
               })}
             </div>
@@ -360,19 +395,19 @@ export default async function TasksPage({
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-1.5 mt-6">
               {currentPage > 1 && (
-                <a
+                <Link
                   href={buildPageUrl(currentPage - 1, params)}
                   className="px-3 py-1.5 rounded-md text-xs transition-all"
                   style={{ background: 'rgba(var(--card), 0.4)', color: 'rgb(var(--foreground-muted))', border: '1px solid rgba(var(--border), 0.3)' }}
                 >
                   Prev
-                </a>
+                </Link>
               )}
               {generatePageNumbers(currentPage, totalPages).map((p, i) =>
                 p === '...' ? (
                   <span key={`ellipsis-${i}`} className="px-2 text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>…</span>
                 ) : (
-                  <a
+                  <Link
                     key={p}
                     href={buildPageUrl(p as number, params)}
                     className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
@@ -383,17 +418,17 @@ export default async function TasksPage({
                     }
                   >
                     {p}
-                  </a>
+                  </Link>
                 )
               )}
               {currentPage < totalPages && (
-                <a
+                <Link
                   href={buildPageUrl(currentPage + 1, params)}
                   className="px-3 py-1.5 rounded-md text-xs transition-all"
                   style={{ background: 'rgba(var(--card), 0.4)', color: 'rgb(var(--foreground-muted))', border: '1px solid rgba(var(--border), 0.3)' }}
                 >
                   Next
-                </a>
+                </Link>
               )}
             </div>
           )}

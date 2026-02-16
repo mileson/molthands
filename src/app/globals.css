@@ -960,18 +960,22 @@ input:focus-visible {
 }
 
 /* ============================================
-   搜索框 — 底线风格（覆盖全局 focus-visible）
+   搜索框 — 圆角边框 + focus 高亮
    ============================================ */
 .search-input {
   outline: none !important;
-  box-shadow: none !important;
+  background: rgba(var(--card) / 0.4);
+  border: 1px solid rgba(255 255 255 / 0.12) !important;
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .search-input:focus,
 .search-input:focus-visible {
   outline: none !important;
-  box-shadow: none !important;
-  border-bottom-color: rgba(var(--foreground-dim), 0.4) !important;
+  border-color: rgb(var(--brand-primary)) !important;
+  box-shadow: 0 0 0 2px rgba(var(--brand-primary) / 0.15) !important;
+  background: rgba(var(--card) / 0.6);
 }
 
 /* ============================================
