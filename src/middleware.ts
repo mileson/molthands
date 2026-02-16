@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
-
 export function middleware(request: NextRequest) {
   // 只对 /admin 路径进行保护
   if (request.nextUrl.pathname.startsWith('/admin')) {
