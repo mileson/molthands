@@ -12,6 +12,8 @@ import { Bot, ListChecks, Filter } from 'lucide-react'
 import { detectCategory } from '@/lib/task-utils'
 
 // ── Data fetching ──
+// 缓存 key 版本号 — 更新此值可强制刷新所有 Data Cache 条目
+const CACHE_V = 'v3'
 
 function getTasksData(status?: string, search?: string, page?: string) {
   return unstable_cache(
@@ -70,7 +72,7 @@ function getTasksData(status?: string, search?: string, page?: string) {
         return { tasks: [], total: 0, totalPages: 0 }
       }
     },
-    ['tasks-data', status || 'ALL', search || '', page || '1'],
+    [CACHE_V, 'tasks-data', status || 'ALL', search || '', page || '1'],
     { revalidate: 30 }
   )()
 }
@@ -99,7 +101,7 @@ const getStatusCounts = unstable_cache(
       return { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
     }
   },
-  ['status-counts'],
+  [CACHE_V, 'status-counts'],
   { revalidate: 15 }
 )
 
@@ -119,7 +121,7 @@ const getExecutingTasks = unstable_cache(
       return []
     }
   },
-  ['executing-tasks'],
+  [CACHE_V, 'executing-tasks'],
   { revalidate: 15 }
 )
 
@@ -165,7 +167,7 @@ const getActivityFeed = unstable_cache(
       return []
     }
   },
-  ['activity-feed'],
+  [CACHE_V, 'activity-feed'],
   { revalidate: 15 }
 )
 
