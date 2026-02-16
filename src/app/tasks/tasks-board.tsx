@@ -2,11 +2,10 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { TaskCard, type TaskCardData } from '@/components/task-card'
-import { TaskSearch } from '@/components/task-search'
 import { detectCategory } from '@/lib/task-utils'
-import { Bot, ListChecks, Filter } from 'lucide-react'
+import { Bot, ListChecks, Filter, Search, Loader2 } from 'lucide-react'
 import type { ActivityItem } from '@/components/activity-ticker'
 
 // ── Types ──
@@ -45,26 +44,47 @@ const STATUS_FILTERS = [
 ]
 
 // ═══════════════════════════════════════════════════
-// TasksInteractive — 客户端交互增强组件
-// ★ 只负责 Filter Bar + Task Grid + Pagination 的交互
-// ★ ActivityTicker / BoardHeader / StatusBar 已由服务端永久渲染
-// ★ 默认视图使用 server 传入的 ISR 数据（毫秒级）
-// ★ 有筛选时从 /api/tasks-board 获取数据（~200ms CDN）
+// TasksInteractive — 纯客户端状态驱动
+// ★ 不使用 <Link> 导航 → 零服务端往返
+// ★ 筛选/分页/搜索全部用 useState + pushState
+// ★ 每次交互只有 1 次 API 调用（~100ms CDN 缓存）
 // ═══════════════════════════════════════════════════
 
 export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData }) {
   const searchParams = useSearchParams()
-  const status = searchParams.get('status')
-  const search = searchParams.get('search')
-  const page = searchParams.get('page')
 
-  const isDefault = (!status || status === 'ALL') && !search && (!page || page === '1')
+  // ── 本地状态（初始化自 URL，之后完全由客户端管理）──
+  const [activeStatus, setActiveStatus] = useState(() => searchParams.get('status') || 'ALL')
+  const [activeSearch, setActiveSearch] = useState(() => searchParams.get('search') || '')
+  const [activePage, setActivePage] = useState(() => parseInt(searchParams.get('page') || '1'))
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('search') || '')
 
-  const [data, setData] = useState<TasksBoardData | null>(() => isDefault ? defaultData : null)
+  const isDefault = activeStatus === 'ALL' && !activeSearch && activePage === 1
+
+  const [data, setData] = useState<TasksBoardData>(() => isDefault ? defaultData : defaultData)
   const [loading, setLoading] = useState(() => !isDefault)
   const fetchIdRef = useRef(0)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const isInitialMount = useRef(true)
 
+  // ── URL 更新（不触发 Next.js 导航）──
+  const updateURL = useCallback((status: string, search: string, page: number) => {
+    const params = new URLSearchParams()
+    if (status && status !== 'ALL') params.set('status', status)
+    if (search) params.set('search', search)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    const url = qs ? `/tasks?${qs}` : '/tasks'
+    window.history.pushState({}, '', url)
+  }, [])
+
+  // ── 数据获取 ──
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      if (isDefault) return
+    }
+
     if (isDefault) {
       setData(defaultData)
       setLoading(false)
@@ -75,9 +95,9 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
     setLoading(true)
 
     const params = new URLSearchParams()
-    if (status && status !== 'ALL') params.set('status', status)
-    if (search) params.set('search', search)
-    if (page && page !== '1') params.set('page', page)
+    if (activeStatus !== 'ALL') params.set('status', activeStatus)
+    if (activeSearch) params.set('search', activeSearch)
+    if (activePage > 1) params.set('page', String(activePage))
 
     fetch(`/api/tasks-board?${params.toString()}`)
       .then(r => r.json())
@@ -93,11 +113,44 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
           setLoading(false)
         }
       })
-  }, [status, search, page, isDefault, defaultData])
+  }, [activeStatus, activeSearch, activePage, isDefault, defaultData])
 
-  const displayData = data || defaultData
-  const activeStatus = status || 'ALL'
-  const currentPage = parseInt(page || '1')
+  // ── 浏览器前进/后退支持 ──
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setActiveStatus(params.get('status') || 'ALL')
+      setActiveSearch(params.get('search') || '')
+      setSearchInput(params.get('search') || '')
+      setActivePage(parseInt(params.get('page') || '1'))
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // ── 交互处理函数 ──
+  const handleFilterClick = useCallback((status: string) => {
+    setActiveStatus(status)
+    setActivePage(1)
+    updateURL(status, activeSearch, 1)
+  }, [activeSearch, updateURL])
+
+  const handlePageClick = useCallback((page: number) => {
+    setActivePage(page)
+    updateURL(activeStatus, activeSearch, page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [activeStatus, activeSearch, updateURL])
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value)
+    clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setActiveSearch(value.trim())
+      setActivePage(1)
+      updateURL(activeStatus, value.trim(), 1)
+    }, 300)
+  }, [activeStatus, updateURL])
+
   const showExecutingSection = activeStatus === 'ALL' || activeStatus === 'EXECUTING'
 
   return (
@@ -105,21 +158,42 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
       {/* ── Filter Bar + Search ── */}
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row gap-3 mb-6">
-          <TaskSearch defaultValue={search || ''} />
+          {/* 内联搜索（不依赖 router.push）*/}
+          <div className="relative flex-1 max-w-md">
+            {loading ? (
+              <Loader2
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin"
+                style={{ color: 'rgb(var(--brand-primary))' }}
+              />
+            ) : (
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                style={{ color: 'rgb(var(--foreground-dim))' }}
+              />
+            )}
+            <input
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-[rgb(var(--foreground-dim))] search-input"
+            />
+          </div>
+          {/* 筛选按钮（button，不是 Link）*/}
           <div className="flex gap-1.5 flex-wrap items-center">
             <Filter className="w-3.5 h-3.5 mr-1" style={{ color: 'rgb(var(--foreground-dim))' }} />
             {STATUS_FILTERS.map(({ key, label }) => {
               const isActive = activeStatus === key
-              const count = key === 'PENDING' ? displayData.statusCounts.pending
-                : key === 'CLAIMED' ? displayData.statusCounts.claimed
-                : key === 'EXECUTING' ? displayData.statusCounts.executing
-                : key === 'COMPLETED' ? displayData.statusCounts.completed
-                : key === 'DONE' ? displayData.statusCounts.done
+              const count = key === 'PENDING' ? data.statusCounts.pending
+                : key === 'CLAIMED' ? data.statusCounts.claimed
+                : key === 'EXECUTING' ? data.statusCounts.executing
+                : key === 'COMPLETED' ? data.statusCounts.completed
+                : key === 'DONE' ? data.statusCounts.done
                 : null
               return (
-                <Link
+                <button
                   key={key}
-                  href={`/tasks?status=${key}${search ? `&search=${search}` : ''}`}
+                  type="button"
+                  onClick={() => handleFilterClick(key)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer border ${
                     isActive
                       ? 'border-[rgb(var(--brand-primary))] shadow-[0_0_8px_rgba(var(--brand-primary)/0.2)]'
@@ -135,7 +209,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
                   {count !== null && (
                     <span className={`ml-1 ${isActive ? 'opacity-80' : 'opacity-50'}`}>{count}</span>
                   )}
-                </Link>
+                </button>
               )
             })}
           </div>
@@ -145,10 +219,10 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
       {/* ── Content Area ── */}
       {loading ? (
         <TasksGridSkeleton />
-      ) : displayData ? (
+      ) : (
         <div className="container mx-auto px-4 pb-8">
           {/* ── NOW EXECUTING ── */}
-          {showExecutingSection && displayData.executingTasks.length > 0 && (
+          {showExecutingSection && data.executingTasks.length > 0 && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <span className="live-dot" />
@@ -156,17 +230,17 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
                   Now Executing
                 </span>
                 <span className="text-[10px]" style={{ color: 'rgb(var(--foreground-dim))' }}>
-                  {displayData.executingTasks.length} tasks
+                  {data.executingTasks.length} tasks
                 </span>
               </div>
               <div className={`grid gap-3 ${
-                displayData.executingTasks.length <= 2
+                data.executingTasks.length <= 2
                   ? 'grid-cols-1 sm:grid-cols-2'
-                  : displayData.executingTasks.length <= 3
+                  : data.executingTasks.length <= 3
                   ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
                   : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
               }`}>
-                {displayData.executingTasks.map((task) => {
+                {data.executingTasks.map((task) => {
                   const cat = detectCategory(task.title)
                   return (
                     <Link
@@ -232,12 +306,12 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
                 {activeStatus === 'ALL' ? 'All Tasks' : `${STATUS_FILTERS.find(s => s.key === activeStatus)?.label || ''} Tasks`}
               </span>
               <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded" style={{ color: 'rgb(var(--foreground-dim))', background: 'rgba(var(--border), 0.15)' }}>
-                {displayData.total}
+                {data.total}
               </span>
             </div>
-            {displayData.tasks.length > 0 ? (
+            {data.tasks.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {displayData.tasks.map((task) => (
+                {data.tasks.map((task) => (
                   <TaskCard key={task.id} task={task} />
                 ))}
               </div>
@@ -252,49 +326,52 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
             )}
           </div>
 
-          {/* ── Pagination ── */}
-          {displayData.totalPages > 1 && (
+          {/* ── Pagination（button，不是 Link）── */}
+          {data.totalPages > 1 && (
             <div className="flex justify-center items-center gap-1.5 mt-6">
-              {currentPage > 1 && (
-                <Link
-                  href={buildPageUrl(currentPage - 1, { status: status || undefined, search: search || undefined })}
-                  className="px-3 py-1.5 rounded-md text-xs transition-all"
+              {activePage > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handlePageClick(activePage - 1)}
+                  className="px-3 py-1.5 rounded-md text-xs transition-all cursor-pointer"
                   style={{ background: 'rgba(var(--card), 0.4)', color: 'rgb(var(--foreground-muted))', border: '1px solid rgba(var(--border), 0.3)' }}
                 >
                   Prev
-                </Link>
+                </button>
               )}
-              {generatePageNumbers(currentPage, displayData.totalPages).map((p, i) =>
+              {generatePageNumbers(activePage, data.totalPages).map((p, i) =>
                 p === '...' ? (
                   <span key={`ellipsis-${i}`} className="px-2 text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>…</span>
                 ) : (
-                  <Link
+                  <button
                     key={p}
-                    href={buildPageUrl(p as number, { status: status || undefined, search: search || undefined })}
-                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+                    type="button"
+                    onClick={() => handlePageClick(p as number)}
+                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer"
                     style={
-                      p === currentPage
+                      p === activePage
                         ? { background: 'rgb(var(--brand-primary))', color: 'white' }
                         : { background: 'rgba(var(--card), 0.4)', color: 'rgb(var(--foreground-muted))', border: '1px solid rgba(var(--border), 0.3)' }
                     }
                   >
                     {p}
-                  </Link>
+                  </button>
                 )
               )}
-              {currentPage < displayData.totalPages && (
-                <Link
-                  href={buildPageUrl(currentPage + 1, { status: status || undefined, search: search || undefined })}
-                  className="px-3 py-1.5 rounded-md text-xs transition-all"
+              {activePage < data.totalPages && (
+                <button
+                  type="button"
+                  onClick={() => handlePageClick(activePage + 1)}
+                  className="px-3 py-1.5 rounded-md text-xs transition-all cursor-pointer"
                   style={{ background: 'rgba(var(--card), 0.4)', color: 'rgb(var(--foreground-muted))', border: '1px solid rgba(var(--border), 0.3)' }}
                 >
                   Next
-                </Link>
+                </button>
               )}
             </div>
           )}
         </div>
-      ) : null}
+      )}
     </>
   )
 }
@@ -322,13 +399,6 @@ function TasksGridSkeleton() {
 }
 
 // ── Helpers ──
-
-function buildPageUrl(page: number, params: { status?: string; search?: string }) {
-  const parts = [`/tasks?page=${page}`]
-  if (params.status) parts.push(`status=${params.status}`)
-  if (params.search) parts.push(`search=${params.search}`)
-  return parts.join('&')
-}
 
 function generatePageNumbers(current: number, total: number): (number | '...')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
