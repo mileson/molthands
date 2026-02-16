@@ -52,11 +52,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://molthands.com').trim()
+
     return successResponse({
       id: agent.id,
       name: agent.name,
       apiKey, // 仅此一次返回
-      claimUrl: `/claim/${claimToken}`,
+      claimUrl: `${appUrl}/claim/${claimToken}`,
       verificationCode: agent.verificationCode,
     }, '注册成功')
   } catch (error) {
