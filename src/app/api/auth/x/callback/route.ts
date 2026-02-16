@@ -20,9 +20,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 解析 state 获取 token
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString())
     const token = stateData.token
+
+    // 从 cookie 读取 PKCE code_verifier（兼容旧流程的 fallback）
+    const codeVerifier = request.cookies.get('x_code_verifier')?.value || 'challenge'
 
     // 用授权码换取访问令牌
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
@@ -35,11 +37,13 @@ export async function GET(request: NextRequest) {
         code,
         grant_type: 'authorization_code',
         redirect_uri: X_CALLBACK_URL,
-        code_verifier: 'challenge',
+        code_verifier: codeVerifier,
       }),
     })
 
     if (!tokenResponse.ok) {
+      const errorBody = await tokenResponse.text().catch(() => '')
+      console.error('X token exchange failed:', tokenResponse.status, errorBody)
       throw new Error('获取令牌失败')
     }
 
@@ -58,12 +62,29 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userResponse.json()
-    const { id: xUserId, username: xHandle, name } = userData.data
+    const { id: xUserId, username: xHandle } = userData.data
 
-    // 重定向到认领验证页面
-    return NextResponse.redirect(
-      new URL(`/claim/${token}?step=verify&xUserId=${xUserId}&xHandle=${xHandle}`, request.url)
-    )
+    // 重定向到认领验证页面，携带 X 身份信息
+    const redirectUrl = new URL(`/claim/${token}`, request.url)
+    redirectUrl.searchParams.set('step', 'verify')
+    redirectUrl.searchParams.set('xUserId', xUserId)
+    redirectUrl.searchParams.set('xHandle', xHandle)
+
+    const response = NextResponse.redirect(redirectUrl)
+
+    // 将 access_token 存入 httpOnly cookie，供后续推文验证使用
+    response.cookies.set('x_access_token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 3600,
+      path: '/',
+    })
+
+    // 清除 PKCE cookie
+    response.cookies.delete('x_code_verifier')
+
+    return response
   } catch (error) {
     console.error('X OAuth 回调失败:', error)
     return NextResponse.redirect(new URL('/claim/error?error=oauth_failed', request.url))

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,25 +11,41 @@ interface ClaimData {
   verificationCode: string
 }
 
-export default function ClaimPage() {
+function ClaimPageContent() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [claiming, setClaiming] = useState(false)
   const [claimData, setClaimData] = useState<ClaimData | null>(null)
   const [error, setError] = useState('')
   const [step, setStep] = useState<'login' | 'verify' | 'success'>('login')
   const [tweetUrl, setTweetUrl] = useState('')
+  const [xUserId, setXUserId] = useState('')
+  const [xHandle, setXHandle] = useState('')
+
+  // 读取 OAuth 回调重定向后的 URL 参数
+  useEffect(() => {
+    const urlStep = searchParams.get('step')
+    const urlXUserId = searchParams.get('xUserId')
+    const urlXHandle = searchParams.get('xHandle')
+
+    if (urlStep === 'verify' && urlXUserId && urlXHandle) {
+      setStep('verify')
+      setXUserId(urlXUserId)
+      setXHandle(urlXHandle)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     async function fetchClaimData() {
       try {
         const res = await fetch(`/api/claim/${params.token}`)
-        if (!res.ok) {
-          setError('认领链接无效或已过期')
+        const data = await res.json()
+        if (data.code !== 0) {
+          setError(data.message || '认领链接无效或已过期')
           return
         }
-        const data = await res.json()
         setClaimData(data.data)
       } catch {
         setError('获取认领信息失败')
@@ -42,7 +58,6 @@ export default function ClaimPage() {
   }, [params.token])
 
   const handleXLogin = () => {
-    // 跳转到 X OAuth
     window.location.href = `/api/auth/x?token=${params.token}`
   }
 
@@ -59,12 +74,12 @@ export default function ClaimPage() {
       const res = await fetch(`/api/claim/${params.token}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tweetUrl }),
+        body: JSON.stringify({ tweetUrl, xUserId, xHandle }),
       })
 
       const data = await res.json()
 
-      if (!res.ok) {
+      if (!res.ok || data.code !== 0) {
         setError(data.message || '验证失败')
         return
       }
@@ -130,6 +145,14 @@ export default function ClaimPage() {
 
           {step === 'verify' && (
             <div className="space-y-6">
+              {xHandle && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                  <p className="text-sm text-green-700">
+                    ✓ 已通过 X 账号 <span className="font-medium">@{xHandle}</span> 登录
+                  </p>
+                </div>
+              )}
+
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm font-medium mb-2">验证码</p>
                 <code className="text-2xl font-bold block text-center">
@@ -173,6 +196,11 @@ export default function ClaimPage() {
               <p className="text-gray-600">
                 Agent <span className="font-medium">{claimData?.name}</span> 已成功认领
               </p>
+              {xHandle && (
+                <p className="text-sm text-gray-500">
+                  绑定 X 账号: @{xHandle}
+                </p>
+              )}
               <Button onClick={() => router.push('/')} className="mt-4">
                 返回首页
               </Button>
@@ -181,5 +209,22 @@ export default function ClaimPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function ClaimPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gray-50">
+          <Header />
+          <div className="container mx-auto px-4 py-20 text-center">
+            <div className="text-gray-500">加载中...</div>
+          </div>
+        </main>
+      }
+    >
+      <ClaimPageContent />
+    </Suspense>
   )
 }
