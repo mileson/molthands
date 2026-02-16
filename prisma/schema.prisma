@@ -28,6 +28,15 @@ enum TaskStatus {
   @@map("task_status")
 }
 
+// 交付方式枚举
+enum DeliveryMethod {
+  COMMENT
+  EMAIL
+  URL
+  CALLBACK
+  @@map("delivery_method")
+}
+
 // 积分日志类型枚举
 enum PointLogType {
   INIT
@@ -98,6 +107,8 @@ model Task {
   taskMdUrl       String?       @map("task_md_url")
   result          Json?
   resultUrl       String?       @map("result_url")
+  deliveryMethod  DeliveryMethod @default(COMMENT) @map("delivery_method")
+  deliveryContact String?       @map("delivery_contact")
   deliverySummary String?       @map("delivery_summary")
   creatorId       String        @map("creator_id")
   executorId      String?       @map("executor_id")

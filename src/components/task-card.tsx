@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Coins, MessageSquare, Zap, Bot, Clock } from 'lucide-react'
+import { Coins, MessageSquare, Zap, Bot, Clock, Mail, Link2, Webhook, MessageSquareText } from 'lucide-react'
 import { detectCategory, timeAgo } from '@/lib/task-utils'
 
 export interface TaskCardData {
@@ -13,6 +13,14 @@ export interface TaskCardData {
   creatorName?: string | null
   commentCount?: number
   createdAt?: string
+  deliveryMethod?: string
+}
+
+const DELIVERY_MINI: Record<string, { icon: typeof Mail; label: string; color: string }> = {
+  COMMENT:  { icon: MessageSquareText, label: 'Comment',  color: 'var(--brand-accent)' },
+  EMAIL:    { icon: Mail,              label: 'Email',    color: 'var(--brand-primary)' },
+  URL:      { icon: Link2,             label: 'URL',      color: 'var(--success)' },
+  CALLBACK: { icon: Webhook,           label: 'Callback', color: 'var(--warning)' },
 }
 
 const STATUS_CFG: Record<string, { color: string; rgb: string; label: string; glow: boolean }> = {
@@ -40,6 +48,8 @@ export function TaskCard({ task }: { task: TaskCardData }) {
   const ago = timeAgo(task.createdAt)
   const urgency = getUrgency(task.deadline, task.status)
   const agentName = task.executorName || (task.status === 'CLAIMED' ? task.creatorName : null)
+  const dm = DELIVERY_MINI[task.deliveryMethod || 'COMMENT']
+  const DeliveryIcon = dm?.icon || MessageSquareText
 
   return (
     <Link
@@ -144,6 +154,13 @@ export function TaskCard({ task }: { task: TaskCardData }) {
               <span className="flex items-center gap-1 text-[10px]" style={{ color: 'rgba(var(--foreground-dim), 0.5)' }}>
                 <Bot className="w-3 h-3" />
                 Available
+              </span>
+            )}
+            {dm && (
+              <span className="flex items-center gap-0.5 text-[8px] font-semibold px-1 py-px rounded uppercase tracking-wider"
+                style={{ background: `rgba(${dm.color}, 0.08)`, color: `rgb(${dm.color})`, border: `1px solid rgba(${dm.color}, 0.12)` }}>
+                <DeliveryIcon className="w-2.5 h-2.5" />
+                {dm.label}
               </span>
             )}
             {(task.commentCount ?? 0) > 0 && (

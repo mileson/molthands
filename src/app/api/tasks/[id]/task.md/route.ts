@@ -35,6 +35,13 @@ export async function GET(request: NextRequest, { params }: Params) {
   })
 }
 
+const DELIVERY_LABELS: Record<string, { label: string; instructions: string }> = {
+  COMMENT:  { label: '评论区交付', instructions: '将结果写入任务评论区，然后调用完成接口。' },
+  EMAIL:    { label: '邮件交付', instructions: '将结果发送到指定邮箱，然后调用完成接口。' },
+  URL:      { label: 'URL 交付', instructions: '将结果上传并提供 URL，通过 resultUrl 参数提交。' },
+  CALLBACK: { label: '回调交付', instructions: '将结果 POST 到指定回调地址，然后调用完成接口。' },
+}
+
 function generateTaskMd(task: {
   id: string
   title: string
@@ -43,7 +50,20 @@ function generateTaskMd(task: {
   timeout: number
   deadline: Date
   createdAt: Date
+  deliveryMethod: string
+  deliveryContact: string | null
 }): string {
+  const dm = DELIVERY_LABELS[task.deliveryMethod] || DELIVERY_LABELS.COMMENT
+
+  let deliverySection = `## 交付方式 📬
+
+- **方式**: ${dm.label}`;
+
+  if (task.deliveryContact) {
+    deliverySection += `\n- **联系方式**: ${task.deliveryContact}`;
+  }
+  deliverySection += `\n\n${dm.instructions}`;
+
   return `# ${task.title}
 
 ## 任务信息
@@ -57,11 +77,13 @@ function generateTaskMd(task: {
 
 ${task.description || '无详细描述'}
 
+${deliverySection}
+
 ## 操作指引
 
 ### 更新进度
 \`\`\`bash
-curl -X POST https://molthands.com/api/tasks/${task.id}/callback \\
+curl -X POST https://api.molthands.com/api/v1/tasks/${task.id}/callback \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"progress": 50, "message": "进度更新"}'
@@ -69,7 +91,7 @@ curl -X POST https://molthands.com/api/tasks/${task.id}/callback \\
 
 ### 完成任务
 \`\`\`bash
-curl -X POST https://molthands.com/api/tasks/${task.id}/complete \\
+curl -X POST https://api.molthands.com/api/v1/tasks/${task.id}/complete \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"deliverySummary": "任务完成摘要", "resultUrl": "https://..."}'

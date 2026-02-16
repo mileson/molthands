@@ -19,6 +19,10 @@ import {
   Terminal,
   Bot,
   Zap,
+  Mail,
+  Link2,
+  Webhook,
+  MessageSquareText,
 } from 'lucide-react'
 
 // ── Status Config ──
@@ -31,6 +35,13 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
   DONE:      { label: 'Completed',       icon: CheckCircle, color: 'text-green-400', rgb: '52, 199, 89' },
   REFUNDED:  { label: 'Refunded',        icon: AlertCircle, color: 'text-red-400', rgb: '248, 113, 113' },
   CANCELLED: { label: 'Cancelled',       icon: AlertCircle, color: 'text-gray-400', rgb: 'var(--foreground-dim)' },
+}
+
+const DELIVERY_CFG: Record<string, { label: string; icon: typeof Mail; color: string; description: string }> = {
+  COMMENT:  { label: 'Comment',  icon: MessageSquareText, color: 'var(--brand-accent)',  description: 'Results posted in task comments' },
+  EMAIL:    { label: 'Email',    icon: Mail,              color: 'var(--brand-primary)', description: 'Results sent via email' },
+  URL:      { label: 'URL',      icon: Link2,             color: 'var(--success)',        description: 'Results delivered as URL' },
+  CALLBACK: { label: 'Callback', icon: Webhook,           color: 'var(--warning)',        description: 'Results sent to callback endpoint' },
 }
 
 const PIPELINE_STAGES = ['PENDING', 'CLAIMED', 'EXECUTING', 'COMPLETED', 'DONE'] as const
@@ -455,6 +466,36 @@ export default async function TaskDetailPage({
                   </div>
                 </div>
               </div>
+
+              {/* ── Delivery Method ── */}
+              {(() => {
+                const dm = DELIVERY_CFG[task.deliveryMethod] || DELIVERY_CFG.COMMENT
+                const DeliveryIcon = dm.icon
+                return (
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgb(var(--foreground-dim))' }}>
+                      Delivery Method
+                    </h3>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center"
+                        style={{ background: `rgba(${dm.color}, 0.12)`, border: `1px solid rgba(${dm.color}, 0.2)` }}
+                      >
+                        <DeliveryIcon className="w-4 h-4" style={{ color: `rgb(${dm.color})` }} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-white">{dm.label}</div>
+                        <div className="text-[10px]" style={{ color: 'rgb(var(--foreground-dim))' }}>{dm.description}</div>
+                      </div>
+                    </div>
+                    {task.deliveryContact && (
+                      <div className="px-3 py-2 rounded-lg text-xs font-mono break-all" style={{ background: 'rgba(var(--border), 0.1)', color: 'rgb(var(--foreground-muted))' }}>
+                        {task.deliveryContact}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* ── Quick Stats ── */}
               <div className="glass-card rounded-xl p-5">

@@ -17,7 +17,7 @@ async function getTasksData(searchParams: { status?: string; search?: string; pa
   try {
     const { status, search, page = '1' } = searchParams
     const pageNum = parseInt(page)
-    const limit = 30
+    const limit = 12
 
     const where: Prisma.TaskWhereInput = {
       ...(status && status !== 'ALL' && { status: status as TaskStatus }),
@@ -52,6 +52,7 @@ async function getTasksData(searchParams: { status?: string; search?: string; pa
         creatorName: t.creator?.name ?? null,
         commentCount: t._count?.comments ?? 0,
         createdAt: t.createdAt.toISOString(),
+        deliveryMethod: t.deliveryMethod,
       })),
       total,
       totalPages: Math.ceil(total / limit),

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse } from '@/lib/api'
 import { verifyApiKey } from '@/lib/auth'
-import { TaskStatus, Prisma } from '@prisma/client'
+import { TaskStatus, DeliveryMethod, Prisma } from '@prisma/client'
 
 // GET /api/tasks - 获取任务列表
 export async function GET(request: NextRequest) {
@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
   return successResponse({
     tasks: tasks.map(t => ({
       ...t,
+      delivery_method: t.deliveryMethod.toLowerCase(),
+      delivery_contact: t.deliveryContact,
       deadline: t.deadline.toISOString(),
       createdAt: t.createdAt.toISOString(),
       claimedAt: t.claimedAt?.toISOString(),
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { title, description, points, timeout } = body
+    const { title, description, points, timeout, delivery_method, delivery_contact } = body
 
     // 验证必填字段
     if (!title || points === undefined || !timeout) {
@@ -82,6 +84,28 @@ export async function POST(request: NextRequest) {
     if (typeof timeout !== 'number' || timeout < 1) {
       return errorResponse(400, '超时时间必须大于 0')
     }
+
+    // 验证交付方式
+    const VALID_DELIVERY_METHODS = ['comment', 'email', 'url', 'callback'] as const
+    const deliveryMethodInput = (delivery_method || 'comment').toLowerCase()
+    if (!VALID_DELIVERY_METHODS.includes(deliveryMethodInput as typeof VALID_DELIVERY_METHODS[number])) {
+      return errorResponse(400, `delivery_method 必须为以下之一: ${VALID_DELIVERY_METHODS.join(', ')}`)
+    }
+
+    // email 类型时 delivery_contact 必须是合法邮箱
+    if (deliveryMethodInput === 'email') {
+      if (!delivery_contact || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(delivery_contact)) {
+        return errorResponse(400, 'delivery_method 为 email 时，delivery_contact 必须提供合法邮箱地址')
+      }
+    }
+    // callback 类型时 delivery_contact 必须是合法 URL
+    if (deliveryMethodInput === 'callback') {
+      if (!delivery_contact || !/^https?:\/\/.+/.test(delivery_contact)) {
+        return errorResponse(400, 'delivery_method 为 callback 时，delivery_contact 必须提供合法 URL')
+      }
+    }
+
+    const deliveryMethodEnum = deliveryMethodInput.toUpperCase() as DeliveryMethod
 
     // 检查积分是否足够
     const availablePoints = agent.points - agent.frozenPoints
@@ -121,6 +145,8 @@ export async function POST(request: NextRequest) {
           points,
           timeout,
           deadline,
+          deliveryMethod: deliveryMethodEnum,
+          deliveryContact: delivery_contact || null,
           creatorId: agent.id,
           status: 'PENDING',
         },
@@ -132,6 +158,8 @@ export async function POST(request: NextRequest) {
       title: task.title,
       points: task.points,
       status: task.status,
+      delivery_method: task.deliveryMethod.toLowerCase(),
+      delivery_contact: task.deliveryContact,
       deadline: task.deadline.toISOString(),
       taskMdUrl: `/api/tasks/${task.id}/task.md`,
     }, '任务创建成功')

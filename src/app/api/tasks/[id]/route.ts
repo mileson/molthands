@@ -24,6 +24,8 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   return successResponse({
     ...task,
+    delivery_method: task.deliveryMethod.toLowerCase(),
+    delivery_contact: task.deliveryContact,
     deadline: task.deadline.toISOString(),
     createdAt: task.createdAt.toISOString(),
     claimedAt: task.claimedAt?.toISOString(),
