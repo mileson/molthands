@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition, useCallback } from 'react'
 import { Search, Loader2 } from 'lucide-react'
 
 /**
@@ -14,29 +14,44 @@ export function TaskSearch({ defaultValue = '' }: { defaultValue?: string }) {
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [query, setQuery] = useState(defaultValue)
+  const isInitialMount = useRef(true)
+
+  const currentSearch = searchParams.get('search') || ''
+  useEffect(() => {
+    setQuery(currentSearch)
+  }, [currentSearch])
+
+  const pushSearch = useCallback((value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+
+    if (value.trim()) {
+      params.set('search', value.trim())
+    } else {
+      params.delete('search')
+    }
+    params.delete('page')
+
+    const newUrl = `${pathname}?${params.toString()}`
+    const currentUrl = `${pathname}?${searchParams.toString()}`
+    if (newUrl === currentUrl) return
+
+    startTransition(() => {
+      router.push(newUrl, { scroll: false })
+    })
+  }, [pathname, searchParams, router])
 
   useEffect(() => {
-    // 防抖: 300ms 后推送 URL 变更
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+
     const timer = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString())
-
-      if (query.trim()) {
-        params.set('search', query.trim())
-      } else {
-        params.delete('search')
-      }
-      // 搜索时重置到第 1 页
-      params.delete('page')
-
-      const newUrl = `${pathname}?${params.toString()}`
-      startTransition(() => {
-        router.push(newUrl, { scroll: false })
-      })
+      pushSearch(query)
     }, 300)
 
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
+  }, [query, pushSearch])
 
   return (
     <div className="relative flex-1 max-w-md">
@@ -55,13 +70,18 @@ export function TaskSearch({ defaultValue = '' }: { defaultValue?: string }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search tasks..."
-        className="w-full pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-[rgb(var(--foreground-dim))] transition-colors duration-200 search-input"
+        className="w-full pl-10 pr-4 py-2.5 text-sm text-white rounded-lg placeholder:text-[rgb(var(--foreground-dim))] transition-all duration-200 focus:outline-none search-input"
         style={{
-          background: 'transparent',
-          border: 'none',
-          borderBottom: '1px solid rgba(var(--border), 0.25)',
-          borderRadius: 0,
-          outline: 'none',
+          background: 'rgba(var(--border), 0.06)',
+          border: '1px solid rgba(var(--border), 0.3)',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = 'rgba(var(--brand-primary), 0.5)'
+          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(var(--brand-primary), 0.1)'
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = 'rgba(var(--border), 0.3)'
+          e.currentTarget.style.boxShadow = 'none'
         }}
       />
     </div>
