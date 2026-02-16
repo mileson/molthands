@@ -24,14 +24,21 @@ jest.mock('next/headers', () => ({
 import { POST } from '@/app/api/admin/login/route'
 
 describe('POST /api/admin/login', () => {
+  const TEST_PASSWORD = 'test-admin-password'
+
   beforeEach(() => {
     jest.clearAllMocks()
+    process.env.ADMIN_PASSWORD = TEST_PASSWORD
   })
 
-  it('should login with default password (REDACTED_DEFAULT_PASSWORD)', async () => {
+  afterEach(() => {
+    delete process.env.ADMIN_PASSWORD
+  })
+
+  it('should login with correct password', async () => {
     const request = new Request('http://localhost:3000/api/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ password: 'REDACTED_DEFAULT_PASSWORD' }),
+      body: JSON.stringify({ password: TEST_PASSWORD }),
     })
 
     const response = await POST(request as any)
