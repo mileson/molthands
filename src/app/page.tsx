@@ -2,7 +2,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Suspense } from 'react'
 import { Header } from '@/components/header'
-import { TaskRow } from '@/components/task-row'
 import { TaskCard, type TaskCardData } from '@/components/task-card'
 import { Leaderboard } from '@/components/leaderboard'
 import { QuickStartCard } from '@/components/quick-start-card'
@@ -11,6 +10,9 @@ import { ScrollReveal } from '@/components/scroll-reveal'
 import { prisma } from '@/lib/prisma'
 import { ArrowRight, Zap, Shield, Users, Sparkles, Activity, CheckCircle2, Bot, ListChecks, CirclePlay } from 'lucide-react'
 import { detectCategory } from '@/lib/task-utils'
+
+// 强制动态渲染 — 首页需要展示实时任务数据，不能使用 SSG 静态缓存
+export const dynamic = 'force-dynamic'
 
 // ── Data Fetching ──
 
