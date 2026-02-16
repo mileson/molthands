@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { TaskCard, type TaskCardData } from '@/components/task-card'
 import { TaskSearch } from '@/components/task-search'
-import { ActivityTicker, type ActivityItem } from '@/components/activity-ticker'
 import { detectCategory } from '@/lib/task-utils'
-import { Bot, ListChecks, Filter, Loader2 } from 'lucide-react'
+import { Bot, ListChecks, Filter } from 'lucide-react'
+import type { ActivityItem } from '@/components/activity-ticker'
 
 // ── Types ──
 
@@ -45,12 +45,14 @@ const STATUS_FILTERS = [
 ]
 
 // ═══════════════════════════════════════════════════
-// TasksBoard — 客户端组件
-// 默认视图使用 server 传入的 ISR 数据（毫秒级）
-// 有筛选时从 /api/tasks-board 获取数据（~200ms CDN）
+// TasksInteractive — 客户端交互增强组件
+// ★ 只负责 Filter Bar + Task Grid + Pagination 的交互
+// ★ ActivityTicker / BoardHeader / StatusBar 已由服务端永久渲染
+// ★ 默认视图使用 server 传入的 ISR 数据（毫秒级）
+// ★ 有筛选时从 /api/tasks-board 获取数据（~200ms CDN）
 // ═══════════════════════════════════════════════════
 
-export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
+export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData }) {
   const searchParams = useSearchParams()
   const status = searchParams.get('status')
   const search = searchParams.get('search')
@@ -93,55 +95,26 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
       })
   }, [status, search, page, isDefault, defaultData])
 
-  // Use header data from whatever we have (default for header counts, loaded for tasks)
-  const headerData = data || defaultData
+  const displayData = data || defaultData
   const activeStatus = status || 'ALL'
   const currentPage = parseInt(page || '1')
   const showExecutingSection = activeStatus === 'ALL' || activeStatus === 'EXECUTING'
 
   return (
     <>
-      {/* ── Activity Ticker ── */}
-      {headerData.activityFeed.length > 0 && (
-        <div style={{ borderBottom: '1px solid rgba(var(--border), 0.12)', background: 'transparent' }}>
-          <div className="container mx-auto px-4">
-            <ActivityTicker items={headerData.activityFeed} />
-          </div>
-        </div>
-      )}
-
-      {/* ── Header: Title + Status Bar + Filters ── */}
-      <div className="container mx-auto px-4 pt-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold text-white">Task Board</h1>
-              {headerData.statusCounts.executing > 0 && (
-                <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgb(var(--brand-primary))' }}>
-                  <span className="live-dot" />
-                  <span className="font-semibold">{headerData.statusCounts.executing} running</span>
-                </span>
-              )}
-            </div>
-            <p className="text-sm" style={{ color: 'rgb(var(--foreground-dim))' }}>
-              {headerData.statusCounts.total} tasks · {headerData.statusCounts.pending + headerData.statusCounts.claimed} available for agents
-            </p>
-          </div>
-        </div>
-
-        <StatusBar counts={headerData.statusCounts} />
-
+      {/* ── Filter Bar + Search ── */}
+      <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row gap-3 mb-6">
           <TaskSearch defaultValue={search || ''} />
           <div className="flex gap-1.5 flex-wrap items-center">
             <Filter className="w-3.5 h-3.5 mr-1" style={{ color: 'rgb(var(--foreground-dim))' }} />
             {STATUS_FILTERS.map(({ key, label }) => {
               const isActive = activeStatus === key
-              const count = key === 'PENDING' ? headerData.statusCounts.pending
-                : key === 'CLAIMED' ? headerData.statusCounts.claimed
-                : key === 'EXECUTING' ? headerData.statusCounts.executing
-                : key === 'COMPLETED' ? headerData.statusCounts.completed
-                : key === 'DONE' ? headerData.statusCounts.done
+              const count = key === 'PENDING' ? displayData.statusCounts.pending
+                : key === 'CLAIMED' ? displayData.statusCounts.claimed
+                : key === 'EXECUTING' ? displayData.statusCounts.executing
+                : key === 'COMPLETED' ? displayData.statusCounts.completed
+                : key === 'DONE' ? displayData.statusCounts.done
                 : null
               return (
                 <Link
@@ -172,10 +145,10 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
       {/* ── Content Area ── */}
       {loading ? (
         <TasksGridSkeleton />
-      ) : data ? (
+      ) : displayData ? (
         <div className="container mx-auto px-4 pb-8">
           {/* ── NOW EXECUTING ── */}
-          {showExecutingSection && data.executingTasks.length > 0 && (
+          {showExecutingSection && displayData.executingTasks.length > 0 && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <span className="live-dot" />
@@ -183,17 +156,17 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
                   Now Executing
                 </span>
                 <span className="text-[10px]" style={{ color: 'rgb(var(--foreground-dim))' }}>
-                  {data.executingTasks.length} tasks
+                  {displayData.executingTasks.length} tasks
                 </span>
               </div>
               <div className={`grid gap-3 ${
-                data.executingTasks.length <= 2
+                displayData.executingTasks.length <= 2
                   ? 'grid-cols-1 sm:grid-cols-2'
-                  : data.executingTasks.length <= 3
+                  : displayData.executingTasks.length <= 3
                   ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
                   : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
               }`}>
-                {data.executingTasks.map((task) => {
+                {displayData.executingTasks.map((task) => {
                   const cat = detectCategory(task.title)
                   return (
                     <Link
@@ -259,12 +232,12 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
                 {activeStatus === 'ALL' ? 'All Tasks' : `${STATUS_FILTERS.find(s => s.key === activeStatus)?.label || ''} Tasks`}
               </span>
               <span className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded" style={{ color: 'rgb(var(--foreground-dim))', background: 'rgba(var(--border), 0.15)' }}>
-                {data.total}
+                {displayData.total}
               </span>
             </div>
-            {data.tasks.length > 0 ? (
+            {displayData.tasks.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {data.tasks.map((task) => (
+                {displayData.tasks.map((task) => (
                   <TaskCard key={task.id} task={task} />
                 ))}
               </div>
@@ -280,7 +253,7 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
           </div>
 
           {/* ── Pagination ── */}
-          {data.totalPages > 1 && (
+          {displayData.totalPages > 1 && (
             <div className="flex justify-center items-center gap-1.5 mt-6">
               {currentPage > 1 && (
                 <Link
@@ -291,7 +264,7 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
                   Prev
                 </Link>
               )}
-              {generatePageNumbers(currentPage, data.totalPages).map((p, i) =>
+              {generatePageNumbers(currentPage, displayData.totalPages).map((p, i) =>
                 p === '...' ? (
                   <span key={`ellipsis-${i}`} className="px-2 text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>…</span>
                 ) : (
@@ -309,7 +282,7 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
                   </Link>
                 )
               )}
-              {currentPage < data.totalPages && (
+              {currentPage < displayData.totalPages && (
                 <Link
                   href={buildPageUrl(currentPage + 1, { status: status || undefined, search: search || undefined })}
                   className="px-3 py-1.5 rounded-md text-xs transition-all"
@@ -327,48 +300,6 @@ export function TasksBoard({ defaultData }: { defaultData: TasksBoardData }) {
 }
 
 // ── Sub Components ──
-
-function StatusBar({ counts }: {
-  counts: { pending: number; claimed: number; executing: number; completed: number; done: number; total: number }
-}) {
-  if (counts.total === 0) return null
-
-  const segments = [
-    { key: 'executing', count: counts.executing, color: 'rgb(var(--brand-primary))', label: 'Executing' },
-    { key: 'claimed', count: counts.claimed, color: 'rgb(var(--warning))', label: 'Claimed' },
-    { key: 'pending', count: counts.pending, color: 'rgb(var(--foreground-dim))', label: 'Open' },
-    { key: 'completed', count: counts.completed, color: 'rgb(var(--success))', label: 'Review' },
-    { key: 'done', count: counts.done, color: 'rgb(52, 199, 89)', label: 'Done' },
-  ].filter(s => s.count > 0)
-
-  return (
-    <div className="mb-6">
-      <div className="h-1.5 rounded-full overflow-hidden flex" style={{ background: 'rgba(var(--border), 0.2)' }}>
-        {segments.map((seg) => (
-          <div
-            key={seg.key}
-            className={seg.key === 'executing' ? 'task-progress-bar' : ''}
-            style={{
-              width: `${(seg.count / counts.total) * 100}%`,
-              background: seg.color,
-              minWidth: seg.count > 0 ? '4px' : '0',
-              transition: 'width 0.5s ease',
-            }}
-          />
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-        {segments.map((seg) => (
-          <span key={seg.key} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'rgb(var(--foreground-dim))' }}>
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
-            {seg.label}
-            <span className="font-semibold text-white">{seg.count}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function TasksGridSkeleton() {
   return (
