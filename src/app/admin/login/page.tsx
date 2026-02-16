@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Lock } from 'lucide-react'
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState('')
@@ -34,30 +35,46 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-96">
-        <h1 className="text-2xl font-bold mb-6 text-center">管理后台登录</h1>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'rgb(var(--background))' }}>
+      <div
+        className="w-full max-w-sm rounded-xl border p-8"
+        style={{
+          background: 'rgb(var(--background-secondary))',
+          borderColor: 'rgba(var(--border), 0.4)',
+        }}
+      >
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <Lock className="w-5 h-5" style={{ color: 'rgb(var(--brand-primary))' }} />
+          <h1 className="text-lg font-bold text-white">管理后台登录</h1>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">管理员密码</label>
+            <label className="block text-xs font-medium mb-2" style={{ color: 'rgb(var(--foreground-dim))' }}>
+              管理员密码
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-2.5 rounded-lg text-sm text-white outline-none transition-all"
+              style={{
+                background: 'rgba(var(--border), 0.2)',
+                border: '1px solid rgba(var(--border), 0.4)',
+              }}
               placeholder="请输入密码"
             />
           </div>
 
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <p className="text-sm" style={{ color: 'rgb(var(--error))' }}>{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-2 rounded-md hover:bg-gray-800 disabled:opacity-50"
+            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50"
+            style={{ background: 'rgb(var(--brand-primary))' }}
           >
             {loading ? '登录中...' : '登录'}
           </button>

@@ -42,9 +42,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
       if (approved) {
         // 通过：转移积分给执行者
+        // 创建任务时只冻结了积分（frozenPoints += cost），points 未变
+        // 验收通过时需要同时扣减 points 和 frozenPoints，积分真正离开创建者
         await tx.agent.update({
           where: { id: agent.id },
           data: {
+            points: { decrement: task.points },
             frozenPoints: { decrement: task.points },
             totalTasks: { increment: 1 },
             successTasks: { increment: 1 },
@@ -110,24 +113,25 @@ export async function POST(request: NextRequest, { params }: Params) {
         return updated
       } else {
         // 拒绝：退还积分给创建者
+        // 创建时只增加了 frozenPoints，points 未变
+        // 拒绝时只需要减少 frozenPoints（解冻），points 不变（因为从未扣减过）
         await tx.agent.update({
           where: { id: agent.id },
           data: {
             frozenPoints: { decrement: task.points },
-            points: { increment: task.points },
             totalTasks: { increment: 1 },
             updatedAt: new Date(),
           },
         })
 
-        // 记录积分日志
+        // 记录积分日志 — 记录解冻，余额 = points - (frozenPoints - cost)
         await tx.pointLog.create({
           data: {
             agentId: agent.id,
             amount: task.points,
             type: 'TASK_REFUND',
             taskId: id,
-            balance: agent.points + task.points,
+            balance: agent.points - agent.frozenPoints + task.points,
           },
         })
 

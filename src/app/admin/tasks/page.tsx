@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import { ArrowLeft, ClipboardList } from 'lucide-react'
 
 async function getTasks(searchParams: { status?: string; page?: string }) {
   const { status, page = '1' } = searchParams
@@ -26,6 +27,16 @@ async function getTasks(searchParams: { status?: string; page?: string }) {
   return { tasks, total, totalPages: Math.ceil(total / limit) }
 }
 
+const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
+  DONE: { label: 'Done', bg: 'rgba(52,199,89,0.12)', text: 'rgb(52,199,89)' },
+  PENDING: { label: 'Pending', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+  CLAIMED: { label: 'Claimed', bg: 'rgba(255,179,40,0.12)', text: 'rgb(255,179,40)' },
+  EXECUTING: { label: 'Executing', bg: 'rgba(var(--brand-primary), 0.12)', text: 'rgb(var(--brand-primary))' },
+  COMPLETED: { label: 'Review', bg: 'rgba(255,179,40,0.12)', text: 'rgb(255,179,40)' },
+  REFUNDED: { label: 'Refunded', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+  CANCELLED: { label: 'Cancelled', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+}
+
 export default async function AdminTasksPage({
   searchParams,
 }: {
@@ -36,83 +47,89 @@ export default async function AdminTasksPage({
   const currentPage = parseInt(params.page || '1')
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow">
+    <div className="min-h-screen" style={{ background: 'rgb(var(--background))' }}>
+      {/* Header */}
+      <header className="border-b" style={{ borderColor: 'rgba(var(--border), 0.4)', background: 'rgb(var(--background-secondary))' }}>
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">任务管理 - 管理后台</h1>
-          <Link href="/admin" className="text-gray-600 hover:text-black">返回首页</Link>
+          <div className="flex items-center gap-3">
+            <ClipboardList className="w-5 h-5" style={{ color: 'rgb(var(--brand-primary))' }} />
+            <h1 className="text-lg font-bold text-white">任务管理</h1>
+          </div>
+          <Link href="/admin" className="flex items-center gap-1.5 text-sm transition-colors" style={{ color: 'rgb(var(--foreground-dim))' }}>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            返回首页
+          </Link>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex gap-2 flex-wrap">
-            {['ALL', 'PENDING', 'CLAIMED', 'EXECUTING', 'COMPLETED', 'DONE', 'REFUNDED', 'CANCELLED'].map((s) => (
-              <a
-                key={s}
-                href={`/admin/tasks?status=${s}`}
-                className={`px-4 py-2 rounded text-sm ${
-                  (params.status || 'ALL') === s
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                {s === 'ALL' ? '全部' : s}
-              </a>
-            ))}
-          </div>
+        <div className="flex gap-2 flex-wrap mb-6">
+          {['ALL', 'PENDING', 'CLAIMED', 'EXECUTING', 'COMPLETED', 'DONE', 'REFUNDED', 'CANCELLED'].map((s) => (
+            <a
+              key={s}
+              href={`/admin/tasks?status=${s}`}
+              className="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: (params.status || 'ALL') === s ? 'rgb(var(--brand-primary))' : 'rgba(var(--border), 0.25)',
+                color: (params.status || 'ALL') === s ? 'white' : 'rgb(var(--foreground-muted))',
+              }}
+            >
+              {s === 'ALL' ? '全部' : s}
+            </a>
+          ))}
         </div>
 
         {/* Tasks Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">ID</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">标题</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">积分</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">创建者</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">执行者</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">创建时间</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">操作</th>
+            <thead>
+              <tr style={{ background: 'rgba(var(--border), 0.15)' }}>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>标题</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>状态</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>积分</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>创建者</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>执行者</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>创建时间</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {tasks.map((task) => (
-                <tr key={task.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-mono">{task.id.slice(0, 8)}...</td>
-                  <td className="px-4 py-3 text-sm">{task.title}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      task.status === 'DONE' ? 'bg-green-100 text-green-700' :
-                      task.status === 'PENDING' ? 'bg-gray-100 text-gray-700' :
-                      task.status === 'EXECUTING' ? 'bg-yellow-100 text-yellow-700' :
-                      task.status === 'COMPLETED' ? 'bg-purple-100 text-purple-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
-                      {task.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{task.points}</td>
-                  <td className="px-4 py-3 text-sm">{task.creator.name}</td>
-                  <td className="px-4 py-3 text-sm">{task.executor?.name || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {task.createdAt.toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <Link href={`/admin/tasks/${task.id}`} className="text-blue-600 hover:underline">
-                      详情
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+            <tbody>
+              {tasks.map((task) => {
+                const sc = statusConfig[task.status] || statusConfig.PENDING
+                return (
+                  <tr
+                    key={task.id}
+                    className="transition-colors"
+                    style={{ borderBottom: '1px solid rgba(var(--border), 0.2)' }}
+                  >
+                    <td className="px-4 py-3 text-xs font-mono" style={{ color: 'rgb(var(--foreground-dim))' }}>{task.id.slice(0, 8)}…</td>
+                    <td className="px-4 py-3 text-sm text-white">{task.title}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded" style={{ background: sc.bg, color: sc.text }}>
+                        {sc.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'rgb(var(--foreground-muted))' }}>{task.points}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'rgb(var(--foreground-muted))' }}>{task.creator.name}</td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'rgb(var(--foreground-dim))' }}>{task.executor?.name || '—'}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>
+                      {task.createdAt.toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <Link href={`/admin/tasks/${task.id}`} style={{ color: 'rgb(var(--brand-primary))' }} className="hover:underline text-xs">
+                        详情
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
 
           {tasks.length === 0 && (
-            <div className="p-8 text-center text-gray-500">暂无任务</div>
+            <div className="p-12 text-center" style={{ color: 'rgb(var(--foreground-dim))' }}>暂无任务</div>
           )}
         </div>
 
@@ -123,9 +140,11 @@ export default async function AdminTasksPage({
               <a
                 key={p}
                 href={`/admin/tasks?page=${p}${params.status ? `&status=${params.status}` : ''}`}
-                className={`px-4 py-2 rounded ${
-                  p === currentPage ? 'bg-black text-white' : 'bg-white shadow hover:bg-gray-50'
-                }`}
+                className="px-3.5 py-1.5 rounded-lg text-sm transition-all"
+                style={{
+                  background: p === currentPage ? 'rgb(var(--brand-primary))' : 'rgba(var(--border), 0.25)',
+                  color: p === currentPage ? 'white' : 'rgb(var(--foreground-muted))',
+                }}
               >
                 {p}
               </a>
@@ -133,7 +152,7 @@ export default async function AdminTasksPage({
           </div>
         )}
 
-        <div className="text-center text-gray-500 text-sm mt-4">
+        <div className="text-center text-xs mt-4" style={{ color: 'rgb(var(--foreground-dim))' }}>
           共 {total} 个任务
         </div>
       </main>

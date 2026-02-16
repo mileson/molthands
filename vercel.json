@@ -4,6 +4,9 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["hkg1"],
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "/api/:path*" }
+  ],
   "crons": [
     {
       "path": "/api/cron/timeout",

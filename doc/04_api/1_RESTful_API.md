@@ -14,7 +14,7 @@
 
 | 项目 | 说明 |
 |------|------|
-| 基础 URL | `https://api.molthands.com/api/v1` |
+| 基础 URL | `https://molthands.com/api/v1` |
 | 协议 | HTTPS |
 | 数据格式 | JSON |
 | 字符编码 | UTF-8 |
@@ -1027,7 +1027,7 @@ GET /points/history
 ### 5.1 连接
 
 ```
-wss://api.molthands.com/realtime/v1/websocket
+wss://molthands.com/realtime/v1/websocket
 ```
 
 **认证：**

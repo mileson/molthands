@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import { LayoutDashboard, Users, ClipboardList, BarChart3 } from 'lucide-react'
 
 async function getStats() {
   const [totalAgents, claimedAgents, totalTasks, completedTasks, totalPoints] = await Promise.all([
@@ -10,7 +11,6 @@ async function getStats() {
     prisma.agent.aggregate({ _sum: { points: true } }),
   ])
 
-  // 最近 24 小时的任务
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const recentTasks = await prisma.task.count({
     where: { createdAt: { gte: yesterday } },
@@ -60,15 +60,30 @@ export default async function AdminDashboard() {
   ])
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen" style={{ background: 'rgb(var(--background))' }}>
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="border-b" style={{ borderColor: 'rgba(var(--border), 0.4)', background: 'rgb(var(--background-secondary))' }}>
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">MoltHands 管理后台</h1>
-          <nav className="flex gap-4">
-            <Link href="/admin/tasks" className="text-gray-600 hover:text-black">任务管理</Link>
-            <Link href="/admin/agents" className="text-gray-600 hover:text-black">Agent 管理</Link>
-            <Link href="/admin/stats" className="text-gray-600 hover:text-black">数据统计</Link>
+          <div className="flex items-center gap-3">
+            <LayoutDashboard className="w-5 h-5" style={{ color: 'rgb(var(--brand-primary))' }} />
+            <h1 className="text-lg font-bold text-white">MoltHands 管理后台</h1>
+          </div>
+          <nav className="flex gap-1">
+            {[
+              { href: '/admin/tasks', label: '任务管理', icon: ClipboardList },
+              { href: '/admin/agents', label: 'Agent 管理', icon: Users },
+              { href: '/admin/stats', label: '数据统计', icon: BarChart3 },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors"
+                style={{ color: 'rgb(var(--foreground-muted))' }}
+              >
+                <item.icon className="w-3.5 h-3.5" />
+                {item.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </header>
@@ -76,72 +91,81 @@ export default async function AdminDashboard() {
       <main className="container mx-auto px-4 py-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.totalAgents}</div>
-            <div className="text-gray-500">总 Agent 数</div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.claimedAgents}</div>
-            <div className="text-gray-500">已认领 Agent</div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.totalTasks}</div>
-            <div className="text-gray-500">总任务数</div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.completedTasks}</div>
-            <div className="text-gray-500">已完成任务</div>
-          </div>
+          {[
+            { value: stats.totalAgents, label: '总 Agent 数', accent: false },
+            { value: stats.claimedAgents, label: '已认领 Agent', accent: false },
+            { value: stats.totalTasks, label: '总任务数', accent: false },
+            { value: stats.completedTasks, label: '已完成任务', accent: true },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl p-5 border"
+              style={{
+                background: 'rgb(var(--background-secondary))',
+                borderColor: 'rgba(var(--border), 0.4)',
+              }}
+            >
+              <div
+                className="text-2xl font-bold mb-1"
+                style={{ color: item.accent ? 'rgb(var(--brand-primary))' : 'rgb(var(--foreground))' }}
+              >
+                {item.value}
+              </div>
+              <div className="text-sm" style={{ color: 'rgb(var(--foreground-dim))' }}>{item.label}</div>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Recent Tasks */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold">最近任务</h2>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(var(--border), 0.3)' }}>
+              <h2 className="font-semibold text-white text-sm">最近任务</h2>
             </div>
-            <div className="divide-y">
+            <div className="divide-y" style={{ borderColor: 'rgba(var(--border), 0.2)' }}>
               {recentTasks.map((task) => (
-                <div key={task.id} className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium">{task.title}</div>
-                      <div className="text-sm text-gray-500">
-                        创建者: {task.creator.name}
-                        {task.executor && ` | 执行者: ${task.executor.name}`}
-                      </div>
+                <div key={task.id} className="px-5 py-3.5 flex justify-between items-start">
+                  <div className="min-w-0 flex-1 mr-3">
+                    <div className="text-sm text-white truncate">{task.title}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'rgb(var(--foreground-dim))' }}>
+                      创建者: {task.creator.name}
+                      {task.executor && ` · 执行者: ${task.executor.name}`}
                     </div>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      task.status === 'DONE' ? 'bg-green-100 text-green-700' :
-                      task.status === 'PENDING' ? 'bg-gray-100 text-gray-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
-                      {task.status}
-                    </span>
                   </div>
+                  <StatusBadge status={task.status} />
                 </div>
               ))}
             </div>
           </div>
 
           {/* Top Agents */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold">积分排行</h2>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(var(--border), 0.3)' }}>
+              <h2 className="font-semibold text-white text-sm">积分排行</h2>
             </div>
-            <div className="divide-y">
+            <div className="divide-y" style={{ borderColor: 'rgba(var(--border), 0.2)' }}>
               {topAgents.map((agent, index) => (
-                <div key={agent.id} className="p-4 flex justify-between items-center">
+                <div key={agent.id} className="px-5 py-3.5 flex justify-between items-center">
                   <div className="flex items-center gap-3">
-                    <span className="w-6 text-center font-bold text-gray-400">{index + 1}</span>
+                    <span
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                      style={{
+                        background: index === 0 ? 'rgba(255,179,40,0.15)' : 'rgba(var(--border), 0.3)',
+                        color: index === 0 ? 'rgb(var(--warning))' : 'rgb(var(--foreground-dim))',
+                      }}
+                    >
+                      {index + 1}
+                    </span>
                     <div>
-                      <div className="font-medium">{agent.name}</div>
+                      <div className="text-sm text-white">{agent.name}</div>
                       {agent.ownerXHandle && (
-                        <div className="text-sm text-gray-500">@{agent.ownerXHandle}</div>
+                        <div className="text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>@{agent.ownerXHandle}</div>
                       )}
                     </div>
                   </div>
-                  <div className="font-bold">{agent.points} 积分</div>
+                  <span className="text-sm font-semibold" style={{ color: 'rgb(var(--foreground-muted))' }}>
+                    {agent.points} <span className="text-xs font-normal" style={{ color: 'rgb(var(--foreground-dim))' }}>pts</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -149,5 +173,26 @@ export default async function AdminDashboard() {
         </div>
       </main>
     </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; bg: string; text: string }> = {
+    DONE: { label: 'Done', bg: 'rgba(52,199,89,0.12)', text: 'rgb(52,199,89)' },
+    PENDING: { label: 'Pending', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+    CLAIMED: { label: 'Claimed', bg: 'rgba(255,179,40,0.12)', text: 'rgb(255,179,40)' },
+    EXECUTING: { label: 'Executing', bg: 'rgba(var(--brand-primary), 0.12)', text: 'rgb(var(--brand-primary))' },
+    COMPLETED: { label: 'Review', bg: 'rgba(255,179,40,0.12)', text: 'rgb(255,179,40)' },
+    REFUNDED: { label: 'Refunded', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+    CANCELLED: { label: 'Cancelled', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+  }
+  const c = config[status] || config.PENDING
+  return (
+    <span
+      className="text-[11px] font-medium px-2 py-0.5 rounded shrink-0"
+      style={{ background: c.bg, color: c.text }}
+    >
+      {c.label}
+    </span>
   )
 }

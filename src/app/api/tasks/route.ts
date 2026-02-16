@@ -71,8 +71,16 @@ export async function POST(request: NextRequest) {
     const { title, description, points, timeout } = body
 
     // 验证必填字段
-    if (!title || !points || !timeout) {
+    if (!title || points === undefined || !timeout) {
       return errorResponse(400, '缺少必填字段')
+    }
+
+    // 验证积分和超时有效性
+    if (typeof points !== 'number' || points < 1) {
+      return errorResponse(400, '积分必须为大于 0 的整数')
+    }
+    if (typeof timeout !== 'number' || timeout < 1) {
+      return errorResponse(400, '超时时间必须大于 0')
     }
 
     // 检查积分是否足够

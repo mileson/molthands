@@ -27,6 +27,11 @@ export async function POST(request: NextRequest, { params }: Params) {
         throw new Error('任务已被认领或已完成')
       }
 
+      // 不允许认领自己创建的任务
+      if (task.creatorId === agent.id) {
+        throw new Error('不能认领自己创建的任务')
+      }
+
       // 检查是否有进行中的任务
       const executingTask = await tx.task.findFirst({
         where: {

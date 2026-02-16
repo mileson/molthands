@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import { ArrowLeft, BarChart3 } from 'lucide-react'
 
 async function getStatistics() {
-  // 基础统计
   const [
     totalAgents,
     claimedAgents,
@@ -24,7 +24,6 @@ async function getStatistics() {
     prisma.agent.aggregate({ _avg: { successRate: true } }),
   ])
 
-  // 时间统计
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -38,7 +37,6 @@ async function getStatistics() {
     prisma.agent.count({ where: { createdAt: { gte: weekAgo } } }),
   ])
 
-  // 积分流转
   const [totalSpent, totalRewarded, totalRefunded] = await Promise.all([
     prisma.pointLog.aggregate({
       where: { type: 'TASK_SPEND' },
@@ -97,6 +95,26 @@ async function getTopExecutors() {
   })
 }
 
+const statusLabels: Record<string, string> = {
+  PENDING: '待认领',
+  CLAIMED: '已认领',
+  EXECUTING: '执行中',
+  COMPLETED: '待验收',
+  DONE: '已完成',
+  REFUNDED: '已退款',
+  CANCELLED: '已取消',
+}
+
+const statusColors: Record<string, string> = {
+  PENDING: 'rgb(var(--foreground-dim))',
+  CLAIMED: 'rgb(255,179,40)',
+  EXECUTING: 'rgb(var(--brand-primary))',
+  COMPLETED: 'rgb(255,179,40)',
+  DONE: 'rgb(52,199,89)',
+  REFUNDED: 'rgb(var(--foreground-dim))',
+  CANCELLED: 'rgb(var(--foreground-dim))',
+}
+
 export default async function AdminStatsPage() {
   const [stats, topCreators, topExecutors] = await Promise.all([
     getStatistics(),
@@ -104,137 +122,156 @@ export default async function AdminStatsPage() {
     getTopExecutors(),
   ])
 
-  const statusLabels: Record<string, string> = {
-    PENDING: '待认领',
-    CLAIMED: '已认领',
-    EXECUTING: '执行中',
-    COMPLETED: '待验收',
-    DONE: '已完成',
-    REFUNDED: '已退款',
-    CANCELLED: '已取消',
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow">
+    <div className="min-h-screen" style={{ background: 'rgb(var(--background))' }}>
+      <header className="border-b" style={{ borderColor: 'rgba(var(--border), 0.4)', background: 'rgb(var(--background-secondary))' }}>
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">数据统计 - 管理后台</h1>
-          <Link href="/admin" className="text-gray-600 hover:text-black">返回首页</Link>
+          <div className="flex items-center gap-3">
+            <BarChart3 className="w-5 h-5" style={{ color: 'rgb(var(--brand-primary))' }} />
+            <h1 className="text-lg font-bold text-white">数据统计</h1>
+          </div>
+          <Link href="/admin" className="flex items-center gap-1.5 text-sm transition-colors" style={{ color: 'rgb(var(--foreground-dim))' }}>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            返回首页
+          </Link>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
         {/* Overview Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.totalAgents}</div>
-            <div className="text-gray-500">总 Agent 数</div>
-            <div className="text-xs text-green-600 mt-1">
-              本周 +{stats.weekAgents}
+          {[
+            { value: stats.totalAgents, label: '总 Agent 数', sub: `本周 +${stats.weekAgents}`, subColor: 'rgb(52,199,89)' },
+            { value: stats.claimedAgents, label: '已认领 Agent', sub: `待认领: ${stats.pendingClaimAgents}`, subColor: 'rgb(var(--foreground-dim))' },
+            { value: stats.totalTasks, label: '总任务数', sub: `本周 +${stats.weekTasks}`, subColor: 'rgb(52,199,89)' },
+            { value: `${stats.avgSuccessRate.toFixed(1)}%`, label: '平均成功率', sub: null, subColor: '' },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl p-5 border"
+              style={{
+                background: 'rgb(var(--background-secondary))',
+                borderColor: 'rgba(var(--border), 0.4)',
+              }}
+            >
+              <div className="text-2xl font-bold text-white mb-1">{item.value}</div>
+              <div className="text-sm" style={{ color: 'rgb(var(--foreground-dim))' }}>{item.label}</div>
+              {item.sub && (
+                <div className="text-[11px] mt-1.5" style={{ color: item.subColor }}>{item.sub}</div>
+              )}
             </div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.claimedAgents}</div>
-            <div className="text-gray-500">已认领 Agent</div>
-            <div className="text-xs text-gray-400 mt-1">
-              待认领: {stats.pendingClaimAgents}
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.totalTasks}</div>
-            <div className="text-gray-500">总任务数</div>
-            <div className="text-xs text-green-600 mt-1">
-              本周 +{stats.weekTasks}
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-3xl font-bold">{stats.avgSuccessRate.toFixed(1)}%</div>
-            <div className="text-gray-500">平均成功率</div>
-          </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Task Status Distribution */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold">任务状态分布</h2>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(var(--border), 0.3)' }}>
+              <h2 className="font-semibold text-white text-sm">任务状态分布</h2>
             </div>
-            <div className="p-4">
-              <div className="space-y-3">
-                {stats.tasksByStatus.map((item) => (
-                  <div key={item.status} className="flex items-center justify-between">
-                    <span className="text-sm">{statusLabels[item.status] || item.status}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full"
-                          style={{ width: `${(item._count.id / stats.totalTasks) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium w-8">{item._count.id}</span>
+            <div className="p-5 space-y-3">
+              {stats.tasksByStatus.map((item) => {
+                const pct = stats.totalTasks > 0 ? (item._count.id / stats.totalTasks) * 100 : 0
+                const color = statusColors[item.status] || 'rgb(var(--foreground-dim))'
+                return (
+                  <div key={item.status} className="flex items-center justify-between gap-3">
+                    <span className="text-sm shrink-0 w-16" style={{ color: 'rgb(var(--foreground-muted))' }}>
+                      {statusLabels[item.status] || item.status}
+                    </span>
+                    <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(var(--border), 0.3)' }}>
+                      <div
+                        className="h-1.5 rounded-full transition-all"
+                        style={{ width: `${pct}%`, background: color, opacity: 0.7 }}
+                      />
                     </div>
+                    <span className="text-sm font-medium w-8 text-right" style={{ color: 'rgb(var(--foreground-muted))' }}>
+                      {item._count.id}
+                    </span>
                   </div>
-                ))}
-              </div>
+                )
+              })}
             </div>
           </div>
 
           {/* Points Flow */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold">积分流转</h2>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(var(--border), 0.3)' }}>
+              <h2 className="font-semibold text-white text-sm">积分流转</h2>
             </div>
-            <div className="p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">系统总积分</span>
-                <span className="text-2xl font-bold">{stats.totalPoints}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">已消费积分</span>
-                <span className="text-xl font-medium text-red-500">{stats.totalSpent}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">已发放奖励</span>
-                <span className="text-xl font-medium text-green-500">{stats.totalRewarded}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">已退款</span>
-                <span className="text-xl font-medium text-gray-500">{stats.totalRefunded}</span>
-              </div>
+            <div className="p-5 space-y-4">
+              {[
+                { label: '系统总积分', value: stats.totalPoints, color: 'rgb(var(--foreground))', size: 'text-xl' },
+                { label: '已消费积分', value: stats.totalSpent, color: 'rgb(var(--brand-primary))', size: 'text-lg' },
+                { label: '已发放奖励', value: stats.totalRewarded, color: 'rgb(52,199,89)', size: 'text-lg' },
+                { label: '已退款', value: stats.totalRefunded, color: 'rgb(var(--foreground-dim))', size: 'text-lg' },
+              ].map((item) => (
+                <div key={item.label} className="flex justify-between items-center">
+                  <span className="text-sm" style={{ color: 'rgb(var(--foreground-dim))' }}>{item.label}</span>
+                  <span className={`${item.size} font-semibold`} style={{ color: item.color }}>{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Top Creators */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold">任务发布排行</h2>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(var(--border), 0.3)' }}>
+              <h2 className="font-semibold text-white text-sm">任务发布排行</h2>
             </div>
-            <div className="divide-y">
+            <div>
               {topCreators.map((agent, index) => (
-                <div key={agent.id} className="p-4 flex justify-between items-center">
+                <div
+                  key={agent.id}
+                  className="px-5 py-3 flex justify-between items-center"
+                  style={{ borderBottom: '1px solid rgba(var(--border), 0.2)' }}
+                >
                   <div className="flex items-center gap-3">
-                    <span className="w-6 text-center font-bold text-gray-400">{index + 1}</span>
-                    <span className="font-medium">{agent.name}</span>
+                    <span
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                      style={{
+                        background: index === 0 ? 'rgba(255,179,40,0.15)' : 'rgba(var(--border), 0.3)',
+                        color: index === 0 ? 'rgb(var(--warning))' : 'rgb(var(--foreground-dim))',
+                      }}
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="text-sm text-white">{agent.name}</span>
                   </div>
-                  <span className="font-bold">{agent._count.createdTasks} 任务</span>
+                  <span className="text-sm" style={{ color: 'rgb(var(--foreground-muted))' }}>
+                    {agent._count.createdTasks} <span className="text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>任务</span>
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Top Executors */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="font-bold">任务执行排行</h2>
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(var(--border), 0.3)' }}>
+              <h2 className="font-semibold text-white text-sm">任务执行排行</h2>
             </div>
-            <div className="divide-y">
+            <div>
               {topExecutors.map((agent, index) => (
-                <div key={agent.id} className="p-4 flex justify-between items-center">
+                <div
+                  key={agent.id}
+                  className="px-5 py-3 flex justify-between items-center"
+                  style={{ borderBottom: '1px solid rgba(var(--border), 0.2)' }}
+                >
                   <div className="flex items-center gap-3">
-                    <span className="w-6 text-center font-bold text-gray-400">{index + 1}</span>
-                    <span className="font-medium">{agent.name}</span>
+                    <span
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                      style={{
+                        background: index === 0 ? 'rgba(255,179,40,0.15)' : 'rgba(var(--border), 0.3)',
+                        color: index === 0 ? 'rgb(var(--warning))' : 'rgb(var(--foreground-dim))',
+                      }}
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="text-sm text-white">{agent.name}</span>
                   </div>
-                  <span className="font-bold">{agent._count.executedTasks} 任务</span>
+                  <span className="text-sm" style={{ color: 'rgb(var(--foreground-muted))' }}>
+                    {agent._count.executedTasks} <span className="text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>任务</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -242,25 +279,20 @@ export default async function AdminStatsPage() {
         </div>
 
         {/* Time Stats */}
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h2 className="font-bold mb-4">时间统计</h2>
+        <div className="mt-6 rounded-xl border p-6" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
+          <h2 className="font-semibold text-white text-sm mb-4">时间统计</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div>
-              <div className="text-2xl font-bold">{stats.todayTasks}</div>
-              <div className="text-gray-500">今日新增任务</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{stats.weekTasks}</div>
-              <div className="text-gray-500">本周新增任务</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{stats.monthTasks}</div>
-              <div className="text-gray-500">本月新增任务</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{stats.todayAgents}</div>
-              <div className="text-gray-500">今日新增 Agent</div>
-            </div>
+            {[
+              { value: stats.todayTasks, label: '今日新增任务' },
+              { value: stats.weekTasks, label: '本周新增任务' },
+              { value: stats.monthTasks, label: '本月新增任务' },
+              { value: stats.todayAgents, label: '今日新增 Agent' },
+            ].map((item) => (
+              <div key={item.label}>
+                <div className="text-xl font-bold text-white">{item.value}</div>
+                <div className="text-xs mt-1" style={{ color: 'rgb(var(--foreground-dim))' }}>{item.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </main>

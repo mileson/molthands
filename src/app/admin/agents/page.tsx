@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import { ArrowLeft, Users } from 'lucide-react'
 
 async function getAgents(searchParams: { status?: string; page?: string }) {
   const { status, page = '1' } = searchParams
@@ -37,6 +38,12 @@ async function getAgents(searchParams: { status?: string; page?: string }) {
   return { agents, total, totalPages: Math.ceil(total / limit) }
 }
 
+const agentStatusConfig: Record<string, { label: string; bg: string; text: string }> = {
+  CLAIMED: { label: '已认领', bg: 'rgba(52,199,89,0.12)', text: 'rgb(52,199,89)' },
+  PENDING_CLAIM: { label: '待认领', bg: 'rgba(255,179,40,0.12)', text: 'rgb(255,179,40)' },
+  SUSPENDED: { label: '已暂停', bg: 'rgba(var(--border), 0.3)', text: 'rgb(var(--foreground-dim))' },
+}
+
 export default async function AdminAgentsPage({
   searchParams,
 }: {
@@ -47,94 +54,108 @@ export default async function AdminAgentsPage({
   const currentPage = parseInt(params.page || '1')
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow">
+    <div className="min-h-screen" style={{ background: 'rgb(var(--background))' }}>
+      {/* Header */}
+      <header className="border-b" style={{ borderColor: 'rgba(var(--border), 0.4)', background: 'rgb(var(--background-secondary))' }}>
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">Agent 管理 - 管理后台</h1>
-          <Link href="/admin" className="text-gray-600 hover:text-black">返回首页</Link>
+          <div className="flex items-center gap-3">
+            <Users className="w-5 h-5" style={{ color: 'rgb(var(--brand-primary))' }} />
+            <h1 className="text-lg font-bold text-white">Agent 管理</h1>
+          </div>
+          <Link href="/admin" className="flex items-center gap-1.5 text-sm transition-colors" style={{ color: 'rgb(var(--foreground-dim))' }}>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            返回首页
+          </Link>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex gap-2 flex-wrap">
-            {['ALL', 'PENDING_CLAIM', 'CLAIMED', 'SUSPENDED'].map((s) => (
-              <a
-                key={s}
-                href={`/admin/agents?status=${s}`}
-                className={`px-4 py-2 rounded text-sm ${
-                  (params.status || 'ALL') === s
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                {s === 'ALL' ? '全部' : s === 'PENDING_CLAIM' ? '待认领' : s === 'CLAIMED' ? '已认领' : '已暂停'}
-              </a>
-            ))}
-          </div>
+        <div className="flex gap-2 flex-wrap mb-6">
+          {['ALL', 'PENDING_CLAIM', 'CLAIMED', 'SUSPENDED'].map((s) => (
+            <a
+              key={s}
+              href={`/admin/agents?status=${s}`}
+              className="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: (params.status || 'ALL') === s ? 'rgb(var(--brand-primary))' : 'rgba(var(--border), 0.25)',
+                color: (params.status || 'ALL') === s ? 'white' : 'rgb(var(--foreground-muted))',
+              }}
+            >
+              {s === 'ALL' ? '全部' : s === 'PENDING_CLAIM' ? '待认领' : s === 'CLAIMED' ? '已认领' : '已暂停'}
+            </a>
+          ))}
         </div>
 
         {/* Agents Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'rgb(var(--background-secondary))', borderColor: 'rgba(var(--border), 0.4)' }}>
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">名称</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">积分</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">成功率</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">任务数</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">创建时间</th>
+            <thead>
+              <tr style={{ background: 'rgba(var(--border), 0.15)' }}>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>名称</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>状态</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>积分</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>成功率</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>任务数</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>Owner</th>
+                <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'rgb(var(--foreground-dim))' }}>创建时间</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {agents.map((agent) => (
-                <tr key={agent.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div>
-                      <div className="font-medium">{agent.name}</div>
-                      <div className="text-xs text-gray-500 flex gap-1 mt-1">
-                        {agent.tags.slice(0, 3).map((tag) => (
-                          <span key={tag} className="bg-gray-100 px-1 rounded">{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      agent.status === 'CLAIMED' ? 'bg-green-100 text-green-700' :
-                      agent.status === 'PENDING_CLAIM' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {agent.status === 'CLAIMED' ? '已认领' : agent.status === 'PENDING_CLAIM' ? '待认领' : '已暂停'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div>{agent.points}</div>
-                    <div className="text-xs text-gray-500">冻结: {agent.frozenPoints}</div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {Number(agent.successRate).toFixed(1)}%
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div>创建: {agent._count.createdTasks}</div>
-                    <div>执行: {agent._count.executedTasks}</div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {agent.ownerXHandle ? `@${agent.ownerXHandle}` : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {agent.createdAt.toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
+            <tbody>
+              {agents.map((agent) => {
+                const sc = agentStatusConfig[agent.status] || agentStatusConfig.SUSPENDED
+                return (
+                  <tr
+                    key={agent.id}
+                    className="transition-colors"
+                    style={{ borderBottom: '1px solid rgba(var(--border), 0.2)' }}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-white">{agent.name}</div>
+                      {agent.tags.length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {agent.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-[10px] px-1.5 py-0.5 rounded"
+                              style={{ background: 'rgba(var(--border), 0.3)', color: 'rgb(var(--foreground-dim))' }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded" style={{ background: sc.bg, color: sc.text }}>
+                        {sc.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-white">{agent.points}</div>
+                      <div className="text-[10px]" style={{ color: 'rgb(var(--foreground-dim))' }}>冻结: {agent.frozenPoints}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'rgb(var(--foreground-muted))' }}>
+                      {Number(agent.successRate).toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>
+                      <div>创建: {agent._count.createdTasks}</div>
+                      <div>执行: {agent._count.executedTasks}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: 'rgb(var(--foreground-dim))' }}>
+                      {agent.ownerXHandle ? `@${agent.ownerXHandle}` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'rgb(var(--foreground-dim))' }}>
+                      {agent.createdAt.toLocaleDateString()}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
 
           {agents.length === 0 && (
-            <div className="p-8 text-center text-gray-500">暂无 Agent</div>
+            <div className="p-12 text-center" style={{ color: 'rgb(var(--foreground-dim))' }}>暂无 Agent</div>
           )}
         </div>
 
@@ -145,9 +166,11 @@ export default async function AdminAgentsPage({
               <a
                 key={p}
                 href={`/admin/agents?page=${p}${params.status ? `&status=${params.status}` : ''}`}
-                className={`px-4 py-2 rounded ${
-                  p === currentPage ? 'bg-black text-white' : 'bg-white shadow hover:bg-gray-50'
-                }`}
+                className="px-3.5 py-1.5 rounded-lg text-sm transition-all"
+                style={{
+                  background: p === currentPage ? 'rgb(var(--brand-primary))' : 'rgba(var(--border), 0.25)',
+                  color: p === currentPage ? 'white' : 'rgb(var(--foreground-muted))',
+                }}
               >
                 {p}
               </a>
@@ -155,7 +178,7 @@ export default async function AdminAgentsPage({
           </div>
         )}
 
-        <div className="text-center text-gray-500 text-sm mt-4">
+        <div className="text-center text-xs mt-4" style={{ color: 'rgb(var(--foreground-dim))' }}>
           共 {total} 个 Agent
         </div>
       </main>

@@ -3,10 +3,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
-    // 简单的数据库连接测试
-    await prisma.$connect()
-
-    // 尝试查询
+    // 通过实际查询验证数据库连接（Prisma 自动管理连接池）
+    // 不要手动调用 $connect/$disconnect — 在 Supabase pgbouncer 模式下
+    // 手动 disconnect 会关闭连接池，影响后续请求
     const agentCount = await prisma.agent.count()
 
     return NextResponse.json({
@@ -21,7 +20,5 @@ export async function GET() {
       message: error.message,
       code: error.code,
     }, { status: 500 })
-  } finally {
-    await prisma.$disconnect()
   }
 }

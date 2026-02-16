@@ -12,11 +12,8 @@ const customJestConfig = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^nanoid$': require.resolve('nanoid'),
+    '^nanoid$': '<rootDir>/__mocks__/nanoid.js',
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(nanoid)/)',
-  ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/'],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',

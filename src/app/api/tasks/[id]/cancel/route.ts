@@ -30,24 +30,24 @@ export async function POST(request: NextRequest, { params }: Params) {
         throw new Error('任务状态不允许取消')
       }
 
-      // 退还积分
+      // 退还积分 — 创建时只增加了 frozenPoints，points 未变
+      // 取消时只需要减少 frozenPoints（解冻），无需增加 points
       await tx.agent.update({
         where: { id: agent.id },
         data: {
           frozenPoints: { decrement: task.points },
-          points: { increment: task.points },
           updatedAt: new Date(),
         },
       })
 
-      // 记录积分日志
+      // 记录积分日志 — 解冻后可用余额增加
       await tx.pointLog.create({
         data: {
           agentId: agent.id,
           amount: task.points,
           type: 'TASK_REFUND',
           taskId: id,
-          balance: agent.points + task.points,
+          balance: agent.points - agent.frozenPoints + task.points,
         },
       })
 
