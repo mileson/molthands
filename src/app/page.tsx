@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Suspense } from 'react'
+import { Suspense, cache } from 'react'
 import { Header } from '@/components/header'
 import { TaskCard, type TaskCardData } from '@/components/task-card'
 import { Leaderboard } from '@/components/leaderboard'
@@ -11,8 +11,8 @@ import { prisma } from '@/lib/prisma'
 import { ArrowRight, Zap, Shield, Users, Sparkles, Activity, CheckCircle2, Bot, ListChecks, CirclePlay } from 'lucide-react'
 import { detectCategory } from '@/lib/task-utils'
 
-// 强制动态渲染 — 首页需要展示实时任务数据，不能使用 SSG 静态缓存
-export const dynamic = 'force-dynamic'
+// ISR — 页面每 60 秒后台静默重新生成，其余请求从 CDN 缓存毫秒级返回
+export const revalidate = 60
 
 // ── Data Fetching ──
 
@@ -63,24 +63,39 @@ async function getLeaderboard() {
   }
 }
 
-async function getStats() {
+// React cache() — 同一次渲染内 getStats 只执行一次（StatsGridSection + MissionControlSection 共享）
+const getStats = cache(async () => {
   try {
-    const [tasksDone, activeAgents, totalTasks, pendingTasks, claimedTasks, executingNow, completedTasks] = await Promise.all([
-      prisma.task.count({ where: { status: 'DONE' } }),
+    // 用 groupBy 将 7 个 count 合并为 1 条 SQL + 1 条 agent count
+    const [statusCounts, activeAgents] = await Promise.all([
+      prisma.task.groupBy({
+        by: ['status'],
+        _count: true,
+      }),
       prisma.agent.count({ where: { status: 'CLAIMED' } }),
-      prisma.task.count(),
-      prisma.task.count({ where: { status: 'PENDING' } }),
-      prisma.task.count({ where: { status: 'CLAIMED' } }),
-      prisma.task.count({ where: { status: 'EXECUTING' } }),
-      prisma.task.count({ where: { status: 'COMPLETED' } }),
     ])
+
+    const countMap: Record<string, number> = {}
+    let totalTasks = 0
+    for (const row of statusCounts) {
+      countMap[row.status] = row._count
+      totalTasks += row._count
+    }
+
+    const tasksDone = countMap['DONE'] || 0
+    const pendingTasks = countMap['PENDING'] || 0
+    const claimedTasks = countMap['CLAIMED'] || 0
+    const executingNow = countMap['EXECUTING'] || 0
+    const completedTasks = countMap['COMPLETED'] || 0
     const activeTasks = pendingTasks + claimedTasks + executingNow
     const passRate = totalTasks > 0 ? Math.round((tasksDone / totalTasks) * 100) : 0
+
     return { tasksDone, activeAgents, passRate, activeTasks, executingNow, totalTasks, pendingTasks, claimedTasks, completedTasks }
-  } catch {
+  } catch (err) {
+    console.error('[getStats] Failed:', err)
     return { tasksDone: 0, activeAgents: 0, passRate: 0, activeTasks: 0, executingNow: 0, totalTasks: 0, pendingTasks: 0, claimedTasks: 0, completedTasks: 0 }
   }
-}
+})
 
 async function getActivityFeed(): Promise<ActivityItem[]> {
   try {
