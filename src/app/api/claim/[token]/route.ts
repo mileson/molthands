@@ -19,11 +19,11 @@ export async function GET(request: NextRequest, { params }: Params) {
   })
 
   if (!agent) {
-    return errorResponse(404, '认领链接无效')
+    return errorResponse(404, 'Invalid claim link')
   }
 
   if (agent.status === 'CLAIMED') {
-    return errorResponse(400, '该 Agent 已被认领')
+    return errorResponse(400, 'This agent has already been claimed')
   }
 
   return successResponse({

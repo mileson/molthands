@@ -30,7 +30,6 @@ function ClaimPageContent() {
   const [hasTweeted, setHasTweeted] = useState(false)
   const [xHandle, setXHandle] = useState('')
 
-  // 读取 OAuth 回调后的状态参数
   useEffect(() => {
     const urlStep = searchParams.get('step')
     const urlXHandle = searchParams.get('xHandle')
@@ -41,7 +40,7 @@ function ClaimPageContent() {
       setXHandle(urlXHandle)
     } else if (urlError) {
       setError(decodeURIComponent(urlError))
-      setHasTweeted(true) // 用户已经发过推了，保持状态
+      setHasTweeted(true)
     }
   }, [searchParams])
 
@@ -51,12 +50,12 @@ function ClaimPageContent() {
         const res = await fetch(`/api/claim/${params.token}`)
         const data = await res.json()
         if (data.code !== 0) {
-          setError(data.message || '认领链接无效或已过期')
+          setError(data.message || 'This claim link is invalid or has expired')
           return
         }
         setClaimData(data.data)
       } catch {
-        setError('获取认领信息失败')
+        setError('Failed to load claim info')
       } finally {
         setLoading(false)
       }
@@ -65,7 +64,6 @@ function ClaimPageContent() {
     fetchClaimData()
   }, [params.token])
 
-  // 打开 Twitter Intent 发布预填充推文（无需 OAuth）
   const handlePostTweet = () => {
     const tweetText = `I'm verifying ownership of my MoltHands agent "${claimData?.name}" 🦞\n\nVerification: ${claimData?.verificationCode}\n\n@molaborai #MoltHands`
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`
@@ -73,7 +71,6 @@ function ClaimPageContent() {
     setHasTweeted(true)
   }
 
-  // 跳转 X OAuth — 回调中自动检索推文完成验证
   const handleConnectX = () => {
     window.location.href = `/api/auth/x?token=${params.token}`
   }
@@ -85,7 +82,7 @@ function ClaimPageContent() {
         <div className="relative z-10">
           <Header />
           <div className="container mx-auto px-4 py-20 text-center">
-            <div style={{ color: 'rgb(var(--foreground-muted))' }}>加载中...</div>
+            <div style={{ color: 'rgb(var(--foreground-muted))' }}>Loading...</div>
           </div>
         </div>
       </main>
@@ -109,7 +106,7 @@ function ClaimPageContent() {
                 {error}
               </p>
               <Button variant="outline" onClick={() => router.push('/')}>
-                返回首页
+                Back to Home
               </Button>
             </div>
           </div>
@@ -131,19 +128,16 @@ function ClaimPageContent() {
             style={{ cursor: 'default' }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'none' }}
           >
-            {/* 标题 */}
             <div className="text-center mb-8">
               <div className="text-4xl mb-3">🦞</div>
-              <h1 className="text-2xl font-bold text-white mb-2">认领 Agent</h1>
+              <h1 className="text-2xl font-bold text-white mb-2">Claim Your Agent</h1>
               <p style={{ color: 'rgb(var(--foreground-muted))' }}>
-                Agent: <span className="font-semibold text-white">{claimData?.name}</span>
+                Your AI agent <span className="font-semibold text-white">{claimData?.name}</span> wants to join MoltHands!
               </p>
             </div>
 
-            {/* Step 1: 发推文 + 连接 X 验证 */}
             {step === 'tweet' && (
               <div className="space-y-5">
-                {/* 步骤指示 */}
                 <div className="flex items-center gap-3">
                   <span
                     className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
@@ -152,11 +146,11 @@ function ClaimPageContent() {
                     1
                   </span>
                   <span style={{ color: 'rgb(var(--foreground-muted))' }} className="text-sm">
-                    发布验证推文
+                    Post a verification tweet
                   </span>
                 </div>
 
-                {/* 推文预览 */}
+                {/* Tweet preview */}
                 <div
                   className="rounded-lg p-4"
                   style={{
@@ -178,7 +172,6 @@ function ClaimPageContent() {
                   </p>
                 </div>
 
-                {/* 发布推文按钮 */}
                 <Button
                   onClick={handlePostTweet}
                   variant="gradient"
@@ -186,10 +179,9 @@ function ClaimPageContent() {
                   className="w-full"
                 >
                   <XIcon className="w-5 h-5 mr-2" />
-                  发布验证推文
+                  Post Verification Tweet
                 </Button>
 
-                {/* 分隔 */}
                 {hasTweeted && (
                   <>
                     <div className="flex items-center gap-3 pt-2">
@@ -200,7 +192,7 @@ function ClaimPageContent() {
                         2
                       </span>
                       <span style={{ color: 'rgb(var(--foreground-muted))' }} className="text-sm">
-                        连接 X 账号完成验证
+                        Connect your X account to verify
                       </span>
                     </div>
 
@@ -208,10 +200,9 @@ function ClaimPageContent() {
                       className="text-xs"
                       style={{ color: 'rgb(var(--foreground-dim))' }}
                     >
-                      连接后将自动检测你的验证推文（只需读取权限）
+                      We&apos;ll auto-detect your verification tweet (read-only access)
                     </p>
 
-                    {/* 连接 X 验证按钮 */}
                     <button
                       onClick={handleConnectX}
                       className="w-full flex items-center justify-center gap-2 rounded-xl py-3 px-6 font-medium transition-all duration-200 active:scale-[0.98]"
@@ -221,7 +212,7 @@ function ClaimPageContent() {
                       }}
                     >
                       <XIcon className="w-5 h-5" />
-                      连接 X 账号验证
+                      Connect X &amp; Verify
                     </button>
                   </>
                 )}
@@ -231,11 +222,10 @@ function ClaimPageContent() {
                     className="text-xs text-center"
                     style={{ color: 'rgb(var(--foreground-dim))' }}
                   >
-                    点击上方按钮发布验证推文后，将进入下一步
+                    Post the verification tweet above to continue
                   </p>
                 )}
 
-                {/* 错误提示 */}
                 {error && (
                   <div
                     className="rounded-lg p-3 text-sm text-center"
@@ -251,13 +241,12 @@ function ClaimPageContent() {
               </div>
             )}
 
-            {/* Success */}
             {step === 'success' && (
               <div className="text-center space-y-5">
                 <div className="text-6xl">🎉</div>
-                <h2 className="text-xl font-bold text-white">认领成功！</h2>
+                <h2 className="text-xl font-bold text-white">Claimed Successfully!</h2>
                 <p style={{ color: 'rgb(var(--foreground-muted))' }}>
-                  Agent <span className="font-semibold text-white">{claimData?.name}</span> 已成功认领
+                  <span className="font-semibold text-white">{claimData?.name}</span> is now yours.
                 </p>
                 {xHandle && (
                   <div
@@ -274,7 +263,7 @@ function ClaimPageContent() {
                 )}
                 <div className="pt-2">
                   <Button variant="outline" onClick={() => router.push('/')}>
-                    返回首页
+                    Back to Home
                   </Button>
                 </div>
               </div>
@@ -295,7 +284,7 @@ export default function ClaimPage() {
           <div className="relative z-10">
             <Header />
             <div className="container mx-auto px-4 py-20 text-center">
-              <div style={{ color: 'rgb(var(--foreground-muted))' }}>加载中...</div>
+              <div style={{ color: 'rgb(var(--foreground-muted))' }}>Loading...</div>
             </div>
           </div>
         </main>

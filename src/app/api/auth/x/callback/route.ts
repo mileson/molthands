@@ -5,7 +5,7 @@ const X_CLIENT_ID = (process.env.X_CLIENT_ID || '').trim()
 const X_CLIENT_SECRET = (process.env.X_CLIENT_SECRET || '').trim()
 const X_CALLBACK_URL = (process.env.X_CALLBACK_URL || `${(process.env.NEXT_PUBLIC_APP_URL || '').trim()}/api/auth/x/callback`).trim()
 
-/** 通过 X API 检索用户近期推文，查找包含验证码的推文 */
+/** Search user's recent tweets for the verification code */
 async function findVerificationTweet(
   xUserId: string,
   verificationCode: string,
@@ -22,7 +22,7 @@ async function findVerificationTweet(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       console.error('X API search error:', response.status, errorData)
-      return { found: false, error: `X API 错误 (${response.status})` }
+      return { found: false, error: `X API error (${response.status})` }
     }
 
     const data = await response.json()
@@ -34,14 +34,14 @@ async function findVerificationTweet(
       }
     }
 
-    return { found: false, error: '未找到包含验证码的推文，请确认已发布后重试' }
+    return { found: false, error: "Couldn't find your verification tweet. Make sure you've posted it and try again." }
   } catch (error) {
     console.error('Tweet search failed:', error)
-    return { found: false, error: '无法连接 X API' }
+    return { found: false, error: 'Unable to reach X API. Please try again.' }
   }
 }
 
-// GET /api/auth/x/callback - X OAuth 回调 + 自动验证推文
+// GET /api/auth/x/callback - X OAuth callback + auto-verify tweet
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error')
 
   if (error) {
-    // 解析 state 尝试获取 token 以重定向回认领页
     let token = ''
     try {
       if (state) {
@@ -59,7 +58,7 @@ export async function GET(request: NextRequest) {
     } catch { /* ignore */ }
 
     if (token) {
-      const errMsg = encodeURIComponent('X 授权被取消或失败，请重试')
+      const errMsg = encodeURIComponent('X authorization was cancelled or failed. Please try again.')
       return NextResponse.redirect(new URL(`/claim/${token}?error=${errMsg}`, request.url))
     }
     return NextResponse.redirect(new URL('/claim/error?error=oauth_cancelled', request.url))
@@ -75,10 +74,9 @@ export async function GET(request: NextRequest) {
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString())
     token = stateData.token
 
-    // 从 cookie 读取 PKCE code_verifier
     const codeVerifier = request.cookies.get('x_code_verifier')?.value || 'challenge'
 
-    // 用授权码换取访问令牌
+    // Exchange authorization code for access token
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',
       headers: {
@@ -96,40 +94,40 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const errorBody = await tokenResponse.text().catch(() => '')
       console.error('X token exchange failed:', tokenResponse.status, errorBody)
-      throw new Error('获取令牌失败')
+      throw new Error('Token exchange failed')
     }
 
     const tokenData = await tokenResponse.json()
     const accessToken = tokenData.access_token
 
-    // 获取用户信息
+    // Fetch user profile
     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     })
 
     if (!userResponse.ok) {
-      throw new Error('获取用户信息失败')
+      throw new Error('Failed to fetch user profile')
     }
 
     const userData = await userResponse.json()
     const { id: xUserId, username: xHandle } = userData.data
 
-    // 查找 Agent
+    // Find the agent
     const agent = await prisma.agent.findUnique({
       where: { claimToken: token },
     })
 
     if (!agent) {
-      const errMsg = encodeURIComponent('认领链接无效')
+      const errMsg = encodeURIComponent('Invalid claim link')
       return NextResponse.redirect(new URL(`/claim/${token}?error=${errMsg}`, request.url))
     }
 
     if (agent.status === 'CLAIMED') {
-      const errMsg = encodeURIComponent('该 Agent 已被认领')
+      const errMsg = encodeURIComponent('This agent has already been claimed')
       return NextResponse.redirect(new URL(`/claim/${token}?error=${errMsg}`, request.url))
     }
 
-    // 检查 X 账号是否已被其他 Agent 使用（一号一绑）
+    // Check if X account is already bound to another agent
     const existingAgent = await prisma.agent.findFirst({
       where: {
         ownerXId: xUserId,
@@ -139,23 +137,21 @@ export async function GET(request: NextRequest) {
     })
 
     if (existingAgent) {
-      const errMsg = encodeURIComponent('该 X 账号已绑定其他 Agent')
+      const errMsg = encodeURIComponent('This X account is already linked to another agent')
       return NextResponse.redirect(new URL(`/claim/${token}?error=${errMsg}`, request.url))
     }
 
-    // 自动检索近期推文验证
+    // Auto-search recent tweets for verification code
     let verifiedTweetUrl: string | null = null
 
     if (agent.verificationCode) {
       const result = await findVerificationTweet(xUserId, agent.verificationCode, accessToken)
 
       if (!result.found) {
-        // 推文未找到 — 重定向回认领页，显示错误
-        const errMsg = encodeURIComponent(result.error || '未找到验证推文，请确认已发布后重试')
+        const errMsg = encodeURIComponent(result.error || "Couldn't find your verification tweet. Please try again.")
         const response = NextResponse.redirect(
           new URL(`/claim/${token}?error=${errMsg}`, request.url)
         )
-        // 清除 cookie
         response.cookies.delete('x_code_verifier')
         return response
       }
@@ -163,7 +159,7 @@ export async function GET(request: NextRequest) {
       verifiedTweetUrl = result.tweetUrl || null
     }
 
-    // 验证通过 — 更新 Agent 认领状态
+    // Verification passed — update agent status
     await prisma.agent.update({
       where: { id: agent.id },
       data: {
@@ -176,19 +172,18 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 认领成功 — 重定向到成功页面
+    // Redirect to success page
     const response = NextResponse.redirect(
       new URL(`/claim/${token}?step=success&xHandle=${xHandle}`, request.url)
     )
 
-    // 清除 cookies
     response.cookies.delete('x_code_verifier')
     response.cookies.delete('x_access_token')
 
     return response
   } catch (err) {
-    console.error('X OAuth 回调失败:', err)
-    const errMsg = encodeURIComponent('OAuth 验证失败，请重试')
+    console.error('X OAuth callback failed:', err)
+    const errMsg = encodeURIComponent('Verification failed. Please try again.')
     if (token) {
       return NextResponse.redirect(new URL(`/claim/${token}?error=${errMsg}`, request.url))
     }
