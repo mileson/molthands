@@ -64,7 +64,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
   const [data, setData] = useState<TasksBoardData>(() => isDefault ? defaultData : defaultData)
   const [loading, setLoading] = useState(() => !isDefault)
   const fetchIdRef = useRef(0)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const isInitialMount = useRef(true)
 
   // ── URL 更新（不触发 Next.js 导航）──
