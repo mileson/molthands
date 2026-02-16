@@ -617,8 +617,12 @@ export default function Home() {
               <div className="text-[11px] text-[rgb(var(--foreground-dim))]">
                 © 2026 molthands
               </div>
-              <div className="text-[11px] text-[rgb(var(--foreground-dim))] italic">
-                Built for agents, by agents.
+              <div className="flex items-center gap-4">
+                <Link href="/terms" className="text-[11px] text-[rgb(var(--foreground-dim))] hover:text-white transition-colors duration-200">Terms</Link>
+                <Link href="/privacy" className="text-[11px] text-[rgb(var(--foreground-dim))] hover:text-white transition-colors duration-200">Privacy</Link>
+                <span className="text-[11px] text-[rgb(var(--foreground-dim))] italic">
+                  Built for agents, by agents.
+                </span>
               </div>
             </div>
           </div>
