@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { unstable_cache } from 'next/cache'
 import { Header } from '@/components/header'
 import { TaskCard } from '@/components/task-card'
 import { TaskSearch } from '@/components/task-search'
@@ -10,122 +11,139 @@ import { TaskStatus, Prisma } from '@prisma/client'
 import { Bot, ListChecks, Filter } from 'lucide-react'
 import { detectCategory } from '@/lib/task-utils'
 
+// ISR — 页面每 60 秒后台静默重新生成，其余请求从 CDN 缓存毫秒级返回
+export const revalidate = 60
+
 // ═══════════════════════════════════════════════════
-// Data Fetching — 合并为 2 组查询，减少 DB 连接开销
+// Data Fetching — unstable_cache 跨请求缓存 + 不在内部 catch
+//
+// ★ 关键：不在 cache 函数内部 try/catch
+//   → 查询失败时错误直接抛出 → unstable_cache 不会缓存失败结果
+//   → 下次请求重新查询（DB warm 后必定成功）→ 正确结果被缓存
+//   → 此前的 bug 正是因为 catch 在内部把错误转为空数组被缓存
 // ═══════════════════════════════════════════════════
 
-// 组 1: 轻量级元数据（statusCounts + activityFeed）
-async function getHeaderData() {
-  const [statusGroups, recentLogs] = await Promise.all([
-    prisma.task.groupBy({
-      by: ['status'],
-      _count: { status: true },
-    }),
-    prisma.taskLog.findMany({
-      select: {
-        id: true,
-        status: true,
-        progress: true,
-        task: {
-          select: {
-            title: true,
-            executor: { select: { name: true } },
-            creator: { select: { name: true } },
+// 组 1: 轻量级元数据（statusCounts + activityFeed）— 无参数，全局唯一缓存
+const getHeaderData = unstable_cache(
+  async () => {
+    const [statusGroups, recentLogs] = await Promise.all([
+      prisma.task.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      }),
+      prisma.taskLog.findMany({
+        select: {
+          id: true,
+          status: true,
+          progress: true,
+          task: {
+            select: {
+              title: true,
+              executor: { select: { name: true } },
+              creator: { select: { name: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 12,
-    }),
-  ])
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+      }),
+    ])
 
-  const counts = { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
-  for (const g of statusGroups) {
-    const c = g._count.status
-    counts.total += c
-    switch (g.status) {
-      case 'PENDING': counts.pending = c; break
-      case 'CLAIMED': counts.claimed = c; break
-      case 'EXECUTING': counts.executing = c; break
-      case 'COMPLETED': counts.completed = c; break
-      case 'DONE': counts.done = c; break
+    const counts = { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
+    for (const g of statusGroups) {
+      const c = g._count.status
+      counts.total += c
+      switch (g.status) {
+        case 'PENDING': counts.pending = c; break
+        case 'CLAIMED': counts.claimed = c; break
+        case 'EXECUTING': counts.executing = c; break
+        case 'COMPLETED': counts.completed = c; break
+        case 'DONE': counts.done = c; break
+      }
     }
-  }
 
-  const activityFeed: ActivityItem[] = recentLogs.map((log) => {
-    const agentName = log.task.executor?.name || log.task.creator?.name || 'Agent'
-    let type: ActivityItem['type'] = 'executing'
-    let detail: string | undefined
-    if (log.status === 'COMPLETED' || log.status === 'DONE') type = 'completed'
-    else if (log.status === 'CLAIMED') type = 'claimed'
-    else if (log.status === 'EXECUTING') { type = 'executing'; if (log.progress) detail = `${log.progress}%` }
-    else if (log.status === 'PENDING') type = 'posted'
-    return { id: log.id, type, agentName, taskTitle: log.task.title, detail }
-  })
+    const activityFeed: ActivityItem[] = recentLogs.map((log) => {
+      const agentName = log.task.executor?.name || log.task.creator?.name || 'Agent'
+      let type: ActivityItem['type'] = 'executing'
+      let detail: string | undefined
+      if (log.status === 'COMPLETED' || log.status === 'DONE') type = 'completed'
+      else if (log.status === 'CLAIMED') type = 'claimed'
+      else if (log.status === 'EXECUTING') { type = 'executing'; if (log.progress) detail = `${log.progress}%` }
+      else if (log.status === 'PENDING') type = 'posted'
+      return { id: log.id, type, agentName, taskTitle: log.task.title, detail }
+    })
 
-  return { statusCounts: counts, activityFeed }
-}
+    return { statusCounts: counts, activityFeed }
+  },
+  ['tasks-header-v3'],
+  { revalidate: 60, tags: ['tasks'] }
+)
 
 // 组 2: 任务数据（executing + paginated list）
-async function getTasksBundle(status?: string, search?: string, page?: string) {
-  const pageNum = parseInt(page || '1')
-  const limit = 12
-  const activeStatus = status || 'ALL'
-  const showExecuting = activeStatus === 'ALL' || activeStatus === 'EXECUTING'
+// unstable_cache 自动将函数参数（status/search/page）纳入 cache key
+// 不同筛选组合各自独立缓存，60 秒后自动更新
+const getTasksBundle = unstable_cache(
+  async (status?: string, search?: string, page?: string) => {
+    const pageNum = parseInt(page || '1')
+    const limit = 12
+    const showExecuting = !status || status === 'EXECUTING'
 
-  const where: Prisma.TaskWhereInput = {
-    ...(status && status !== 'ALL' && { status: status as TaskStatus }),
-    ...(search && {
-      OR: [
-        { title: { contains: search, mode: 'insensitive' as const } },
-        { description: { contains: search, mode: 'insensitive' as const } },
-      ],
-    }),
-  }
+    const where: Prisma.TaskWhereInput = {
+      ...(status && { status: status as TaskStatus }),
+      ...(search && {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' as const } },
+          { description: { contains: search, mode: 'insensitive' as const } },
+        ],
+      }),
+    }
 
-  const [tasks, total, executingTasks] = await Promise.all([
-    prisma.task.findMany({
-      where,
-      select: {
-        id: true, title: true, status: true, points: true,
-        progress: true, deadline: true, createdAt: true, deliveryMethod: true,
-        executor: { select: { name: true } },
-        creator: { select: { name: true } },
-        _count: { select: { comments: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: (pageNum - 1) * limit,
-      take: limit,
-    }),
-    prisma.task.count({ where }),
-    showExecuting
-      ? prisma.task.findMany({
-          where: { status: 'EXECUTING' },
-          select: {
-            id: true, title: true, points: true, progress: true,
-            executor: { select: { name: true } },
-          },
-          orderBy: { claimedAt: 'desc' },
-          take: 6,
-        })
-      : Promise.resolve([]),
-  ])
+    const [tasks, total, executingTasks] = await Promise.all([
+      prisma.task.findMany({
+        where,
+        select: {
+          id: true, title: true, status: true, points: true,
+          progress: true, deadline: true, createdAt: true, deliveryMethod: true,
+          executor: { select: { name: true } },
+          creator: { select: { name: true } },
+          _count: { select: { comments: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (pageNum - 1) * limit,
+        take: limit,
+      }),
+      prisma.task.count({ where }),
+      showExecuting
+        ? prisma.task.findMany({
+            where: { status: 'EXECUTING' },
+            select: {
+              id: true, title: true, points: true, progress: true,
+              executor: { select: { name: true } },
+            },
+            orderBy: { claimedAt: 'desc' },
+            take: 6,
+          })
+        : Promise.resolve([]),
+    ])
 
-  return {
-    tasks: tasks.map(t => ({
-      ...t,
-      deadline: t.deadline.toISOString(),
-      executorName: t.executor?.name ?? null,
-      creatorName: t.creator?.name ?? null,
-      commentCount: t._count?.comments ?? 0,
-      createdAt: t.createdAt.toISOString(),
-      deliveryMethod: t.deliveryMethod,
-    })),
-    total,
-    totalPages: Math.ceil(total / limit),
-    executingTasks,
-  }
-}
+    return {
+      tasks: tasks.map(t => ({
+        ...t,
+        deadline: t.deadline.toISOString(),
+        executorName: t.executor?.name ?? null,
+        creatorName: t.creator?.name ?? null,
+        commentCount: t._count?.comments ?? 0,
+        createdAt: t.createdAt.toISOString(),
+        deliveryMethod: t.deliveryMethod,
+      })),
+      total,
+      totalPages: Math.ceil(total / limit),
+      executingTasks,
+    }
+  },
+  ['tasks-bundle-v3'],
+  { revalidate: 60, tags: ['tasks'] }
+)
 
 // ── Status filter config ──
 
@@ -143,17 +161,18 @@ const statusFilters = [
 // ═══════════════════════════════════════════════════
 
 async function HeaderSection({
-  params,
+  searchParamsPromise,
 }: {
-  params: { status?: string; search?: string; page?: string }
+  searchParamsPromise: Promise<{ status?: string; search?: string; page?: string }>
 }) {
+  const params = await searchParamsPromise
   let statusCounts = { pending: 0, claimed: 0, executing: 0, completed: 0, done: 0, total: 0 }
   let activityFeed: ActivityItem[] = []
   try {
     const data = await getHeaderData()
     statusCounts = data.statusCounts
     activityFeed = data.activityFeed
-  } catch { /* 容错 */ }
+  } catch { /* 容错：首次冷启动失败时显示空状态，下次请求自动恢复 */ }
   const activeStatus = params.status || 'ALL'
 
   return (
@@ -232,22 +251,29 @@ async function HeaderSection({
 // ═══════════════════════════════════════════════════
 
 async function TasksSection({
-  params,
+  searchParamsPromise,
 }: {
-  params: { status?: string; search?: string; page?: string }
+  searchParamsPromise: Promise<{ status?: string; search?: string; page?: string }>
 }) {
+  const params = await searchParamsPromise
+
+  // 规范化参数：'ALL' → undefined, '' → undefined，确保相同筛选条件命中同一缓存
+  const cacheStatus = params.status && params.status !== 'ALL' ? params.status : undefined
+  const cacheSearch = params.search || undefined
+  const cachePage = params.page || undefined
+
   let tasks: Awaited<ReturnType<typeof getTasksBundle>>['tasks'] = []
   let total = 0
   let totalPages = 0
   let executingTasks: Awaited<ReturnType<typeof getTasksBundle>>['executingTasks'] = []
 
   try {
-    const data = await getTasksBundle(params.status, params.search, params.page)
+    const data = await getTasksBundle(cacheStatus, cacheSearch, cachePage)
     tasks = data.tasks
     total = data.total
     totalPages = data.totalPages
     executingTasks = data.executingTasks
-  } catch { /* 容错 */ }
+  } catch { /* 容错：首次冷启动失败时显示空状态，下次请求自动恢复 */ }
 
   const currentPage = parseInt(params.page || '1')
   const activeStatus = params.status || 'ALL'
@@ -450,16 +476,17 @@ function TasksSkeleton() {
 }
 
 // ═══════════════════════════════════════════════════
-// Page — 静态 shell + 2 个独立 Suspense 边界流式渲染
+// Page — 不 await searchParams → 静态 shell 可被 ISR 缓存 + Link 预取
+//   searchParams Promise 直接传入 Suspense 子组件
+//   → Header / PageBackground / skeleton 在 CDN 缓存，毫秒级到达浏览器
+//   → 动态数据在 Suspense 边界内流式渲染
 // ═══════════════════════════════════════════════════
 
-export default async function TasksPage({
+export default function TasksPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string; search?: string; page?: string }>
 }) {
-  const params = await searchParams
-
   return (
     <main className="min-h-screen relative">
       <PageBackground variant="subtle" />
@@ -469,12 +496,12 @@ export default async function TasksPage({
 
         {/* Boundary 1: Header 区域 — 轻量查询先出 */}
         <Suspense fallback={<HeaderSkeleton />}>
-          <HeaderSection params={params} />
+          <HeaderSection searchParamsPromise={searchParams} />
         </Suspense>
 
         {/* Boundary 2: 任务列表 — 较重查询后出 */}
         <Suspense fallback={<TasksSkeleton />}>
-          <TasksSection params={params} />
+          <TasksSection searchParamsPromise={searchParams} />
         </Suspense>
       </div>
     </main>
