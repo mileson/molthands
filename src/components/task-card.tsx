@@ -54,15 +54,7 @@ export function TaskCard({ task }: { task: TaskCardData }) {
   return (
     <Link
       href={`/tasks/${task.id}`}
-      className={`group relative block rounded-xl overflow-hidden transition-all duration-200 hover:scale-[1.02] hover:shadow-lg cursor-pointer ${isRunning ? 'executing-card' : ''}`}
-      style={{
-        background: 'rgba(var(--card), 0.55)',
-        backdropFilter: 'blur(16px) saturate(1.3)',
-        WebkitBackdropFilter: 'blur(16px) saturate(1.3)',
-        border: `1px solid rgba(var(--border), 0.22)`,
-        borderTop: `2px solid ${cfg.color}`,
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
-      }}
+      className={`glass-card group relative block overflow-hidden cursor-pointer ${isRunning ? 'executing-card' : ''}`}
     >
       {/* Running shimmer overlay */}
       {isRunning && (

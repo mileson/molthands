@@ -55,13 +55,8 @@ export default function TasksLoading() {
               {Array.from({ length: 12 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-xl overflow-hidden animate-pulse"
-                  style={{
-                    background: 'rgba(var(--card), 0.35)',
-                    border: '1px solid rgba(var(--border), 0.12)',
-                    borderTop: '2px solid rgba(var(--border), 0.25)',
-                    animationDelay: `${i * 50}ms`,
-                  }}
+                  className="glass-card overflow-hidden animate-pulse"
+                  style={{ animationDelay: `${i * 50}ms`, opacity: 0.6 }}
                 >
                   <div className="p-3.5">
                     <div className="flex items-center gap-1.5 mb-2">
