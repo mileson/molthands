@@ -374,7 +374,7 @@ async function MissionControlSection() {
                   <h3 className="text-lg font-bold">Leaderboard</h3>
                 </div>
                 <Link href="/leaderboard" className="btn-ghost text-xs flex items-center gap-1.5 group">
-                  More
+                  View All Rankings
                   <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                 </Link>
               </div>
