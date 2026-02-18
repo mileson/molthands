@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
 import { TaskCard, type TaskCardData } from '@/components/task-card'
 import { detectCategory } from '@/lib/task-utils'
 import { Bot, ListChecks, Filter, Search, Loader2 } from 'lucide-react'
@@ -43,17 +43,31 @@ const STATUS_FILTERS = [
   { key: 'DONE', label: 'Done' },
 ]
 
+const CACHE_TTL = 5 * 60 * 1000
+
+function makeCacheKey(status: string, search: string, page: number) {
+  return `${status}|${search}|${page}`
+}
+
+function buildApiUrl(status: string, search: string, page: number, light = false) {
+  const params = new URLSearchParams()
+  if (status !== 'ALL') params.set('status', status)
+  if (search) params.set('search', search)
+  if (page > 1) params.set('page', String(page))
+  if (light) params.set('light', '1')
+  return `/api/tasks-board?${params.toString()}`
+}
+
 // ═══════════════════════════════════════════════════
 // TasksInteractive — 纯客户端状态驱动
-// ★ 不使用 <Link> 导航 → 零服务端往返
-// ★ 筛选/分页/搜索全部用 useState + pushState
-// ★ 每次交互只有 1 次 API 调用（~100ms CDN 缓存）
+// ★ 三级缓存策略：cache hit → stale data → skeleton
+// ★ 预取相邻页面，翻页接近 0ms
+// ★ 轻量 API 模式：翻页只查 tasks 不重复查全局数据
 // ═══════════════════════════════════════════════════
 
 export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData }) {
   const searchParams = useSearchParams()
 
-  // ── 本地状态（初始化自 URL，之后完全由客户端管理）──
   const [activeStatus, setActiveStatus] = useState(() => searchParams.get('status') || 'ALL')
   const [activeSearch, setActiveSearch] = useState(() => searchParams.get('search') || '')
   const [activePage, setActivePage] = useState(() => parseInt(searchParams.get('page') || '1'))
@@ -61,59 +75,128 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
 
   const isDefault = activeStatus === 'ALL' && !activeSearch && activePage === 1
 
-  const [data, setData] = useState<TasksBoardData>(() => isDefault ? defaultData : defaultData)
+  const [data, setData] = useState<TasksBoardData>(() => defaultData)
   const [loading, setLoading] = useState(() => !isDefault)
+  const [refreshing, setRefreshing] = useState(false)
   const fetchIdRef = useRef(0)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const isInitialMount = useRef(true)
 
-  // ── URL 更新（不触发 Next.js 导航）──
+  // ── 客户端页面缓存 ──
+  const cacheRef = useRef(new Map<string, { data: TasksBoardData; ts: number }>())
+  const prefetchingRef = useRef(new Set<string>())
+  const globalDataRef = useRef(defaultData)
+
+  // 初始化：把默认数据存入缓存
+  useEffect(() => {
+    const key = makeCacheKey('ALL', '', 1)
+    cacheRef.current.set(key, { data: defaultData, ts: Date.now() })
+    globalDataRef.current = defaultData
+  }, [defaultData])
+
   const updateURL = useCallback((status: string, search: string, page: number) => {
     const params = new URLSearchParams()
     if (status && status !== 'ALL') params.set('status', status)
     if (search) params.set('search', search)
     if (page > 1) params.set('page', String(page))
     const qs = params.toString()
-    const url = qs ? `/tasks?${qs}` : '/tasks'
-    window.history.pushState({}, '', url)
+    window.history.pushState({}, '', qs ? `/tasks?${qs}` : '/tasks')
   }, [])
 
-  // ── 数据获取 ──
+  // ── 预取函数 ──
+  const prefetch = useCallback((status: string, search: string, page: number) => {
+    if (page < 1) return
+    const key = makeCacheKey(status, search, page)
+    if (cacheRef.current.has(key) || prefetchingRef.current.has(key)) return
+    prefetchingRef.current.add(key)
+
+    fetch(buildApiUrl(status, search, page, true))
+      .then(r => r.json())
+      .then((d: TasksBoardData | { tasks: TaskCardData[]; total: number; totalPages: number }) => {
+        const full: TasksBoardData = 'statusCounts' in d
+          ? d as TasksBoardData
+          : { ...globalDataRef.current, tasks: d.tasks, total: d.total, totalPages: d.totalPages }
+        cacheRef.current.set(key, { data: full, ts: Date.now() })
+      })
+      .catch(() => {})
+      .finally(() => prefetchingRef.current.delete(key))
+  }, [])
+
+  // ── 预取相邻页 ──
+  const prefetchAdjacent = useCallback((status: string, search: string, page: number, totalPages: number) => {
+    if (page > 1) prefetch(status, search, page - 1)
+    if (page < totalPages) prefetch(status, search, page + 1)
+    if (page + 2 <= totalPages) prefetch(status, search, page + 2)
+  }, [prefetch])
+
+  // ── 数据获取（三级策略）──
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
-      if (isDefault) return
+      if (isDefault) {
+        prefetchAdjacent('ALL', '', 1, defaultData.totalPages)
+        return
+      }
     }
 
     if (isDefault) {
       setData(defaultData)
       setLoading(false)
+      setRefreshing(false)
+      prefetchAdjacent('ALL', '', 1, defaultData.totalPages)
+      return
+    }
+
+    const key = makeCacheKey(activeStatus, activeSearch, activePage)
+    const cached = cacheRef.current.get(key)
+
+    // Level 1: 缓存命中（< 5min）→ 瞬间显示
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setData(cached.data)
+      setLoading(false)
+      setRefreshing(false)
+      prefetchAdjacent(activeStatus, activeSearch, activePage, cached.data.totalPages)
       return
     }
 
     const id = ++fetchIdRef.current
-    setLoading(true)
 
-    const params = new URLSearchParams()
-    if (activeStatus !== 'ALL') params.set('status', activeStatus)
-    if (activeSearch) params.set('search', activeSearch)
-    if (activePage > 1) params.set('page', String(activePage))
+    // Level 2: 有旧数据 → 显示旧数据 + 顶部进度条（stale-while-revalidate）
+    if (cached) {
+      setData(cached.data)
+      setLoading(false)
+      setRefreshing(true)
+    } else {
+      // Level 3: 无任何数据 → 骨架屏
+      setLoading(true)
+      setRefreshing(false)
+    }
 
-    fetch(`/api/tasks-board?${params.toString()}`)
+    const useLight = !activeSearch
+    fetch(buildApiUrl(activeStatus, activeSearch, activePage, useLight))
       .then(r => r.json())
-      .then((d: TasksBoardData) => {
-        if (id === fetchIdRef.current) {
-          setData(d)
-          setLoading(false)
-        }
+      .then((d: TasksBoardData | { tasks: TaskCardData[]; total: number; totalPages: number }) => {
+        if (id !== fetchIdRef.current) return
+        const full: TasksBoardData = 'statusCounts' in d
+          ? d as TasksBoardData
+          : { ...globalDataRef.current, tasks: d.tasks, total: d.total, totalPages: d.totalPages }
+
+        if ('statusCounts' in d) globalDataRef.current = d as TasksBoardData
+
+        cacheRef.current.set(key, { data: full, ts: Date.now() })
+        setData(full)
+        setLoading(false)
+        setRefreshing(false)
+        prefetchAdjacent(activeStatus, activeSearch, activePage, full.totalPages)
       })
       .catch(() => {
         if (id === fetchIdRef.current) {
-          setData(defaultData)
+          if (!cached) setData(defaultData)
           setLoading(false)
+          setRefreshing(false)
         }
       })
-  }, [activeStatus, activeSearch, activePage, isDefault, defaultData])
+  }, [activeStatus, activeSearch, activePage, isDefault, defaultData, prefetchAdjacent])
 
   // ── 浏览器前进/后退支持 ──
   useEffect(() => {
@@ -128,7 +211,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  // ── 交互处理函数 ──
+  // ── 交互处理 ──
   const handleFilterClick = useCallback((status: string) => {
     setActiveStatus(status)
     setActivePage(1)
@@ -155,10 +238,19 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
 
   return (
     <>
+      {/* ── Refresh 进度条 ── */}
+      {refreshing && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-0.5">
+          <div
+            className="h-full rounded-r-full animate-[progress_1.5s_ease-in-out_infinite]"
+            style={{ background: 'rgb(var(--brand-primary))' }}
+          />
+        </div>
+      )}
+
       {/* ── Filter Bar + Search ── */}
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row gap-3 mb-6">
-          {/* 内联搜索（不依赖 router.push）*/}
           <div className="relative flex-1 max-w-md">
             {loading ? (
               <Loader2
@@ -178,7 +270,6 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
               className="w-full pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-[rgb(var(--foreground-dim))] search-input"
             />
           </div>
-          {/* 筛选按钮（button，不是 Link）*/}
           <div className="flex gap-1.5 flex-wrap items-center">
             <Filter className="w-3.5 h-3.5 mr-1" style={{ color: 'rgb(var(--foreground-dim))' }} />
             {STATUS_FILTERS.map(({ key, label }) => {
@@ -220,7 +311,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
       {loading ? (
         <TasksGridSkeleton />
       ) : (
-        <div className="container mx-auto px-4 pb-8">
+        <div className={`container mx-auto px-4 pb-8 transition-opacity duration-150 ${refreshing ? 'opacity-70' : ''}`}>
           {/* ── NOW EXECUTING ── */}
           {showExecutingSection && data.executingTasks.length > 0 && (
             <div className="mb-6">
@@ -326,7 +417,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
             )}
           </div>
 
-          {/* ── Pagination（button，不是 Link）── */}
+          {/* ── Pagination ── */}
           {data.totalPages > 1 && (
             <div className="flex justify-center items-center gap-1.5 mt-6">
               {activePage > 1 && (
@@ -347,6 +438,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
                     key={p}
                     type="button"
                     onClick={() => handlePageClick(p as number)}
+                    onMouseEnter={() => prefetch(activeStatus, activeSearch, p as number)}
                     className="px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer"
                     style={
                       p === activePage
