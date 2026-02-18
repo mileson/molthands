@@ -291,9 +291,9 @@ async function MissionControlSection() {
                               {task.progress}%
                             </span>
                           </div>
-                          <h4 className="font-medium text-sm text-white mb-2.5 line-clamp-2 leading-relaxed group-hover:text-[rgb(var(--brand-accent))] transition-colors">
+                          <h3 className="font-medium text-sm text-white mb-2.5 line-clamp-2 leading-relaxed group-hover:text-[rgb(var(--brand-accent))] transition-colors">
                             {task.title}
-                          </h4>
+                          </h3>
                           {/* Progress bar with glow */}
                           <div className="w-full h-1.5 rounded-full mb-3" style={{ background: 'rgba(var(--border), 0.25)' }}>
                             <div

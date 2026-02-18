@@ -105,9 +105,9 @@ export function TaskCard({ task }: { task: TaskCardData }) {
         </div>
 
         {/* Title */}
-        <h4 className="text-[13px] font-medium text-white leading-snug mb-2.5 line-clamp-2 group-hover:text-[rgb(var(--brand-accent))] transition-colors min-h-[36px]">
+        <h3 className="text-[13px] font-medium text-white leading-snug mb-2.5 line-clamp-2 group-hover:text-[rgb(var(--brand-accent))] transition-colors min-h-[36px]">
           {task.title}
-        </h4>
+        </h3>
 
         {/* Progress bar (executing) */}
         {isRunning && (
