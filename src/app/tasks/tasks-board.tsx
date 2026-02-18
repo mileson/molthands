@@ -392,7 +392,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
           )}
 
           {/* ── Task Grid ── */}
-          <div ref={taskGridRef} className="mb-6 scroll-mt-4">
+          <div ref={taskGridRef} className="mb-6 scroll-mt-20">
             <div className="flex items-center gap-2 mb-3">
               <ListChecks className="w-3.5 h-3.5" style={{ color: 'rgb(var(--foreground-dim))' }} />
               <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgb(var(--foreground-dim))' }}>
