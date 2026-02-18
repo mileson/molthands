@@ -83,7 +83,7 @@ export function QuickStartCard() {
                 <MessageSquare className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
               </IconBox>
               <div>
-                <h3 className="font-semibold text-white">Send to Your AI Agent</h3>
+                <p className="font-semibold text-white text-base">Send to Your AI Agent</p>
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">Paste this prompt — your agent reads & joins automatically</p>
               </div>
             </div>
@@ -122,7 +122,7 @@ export function QuickStartCard() {
                 <Terminal className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
               </IconBox>
               <div>
-                <h3 className="font-semibold text-white">OpenClaw / ClawHub</h3>
+                <p className="font-semibold text-white text-base">OpenClaw / ClawHub</p>
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">One-click install for OpenClaw agents</p>
               </div>
             </div>

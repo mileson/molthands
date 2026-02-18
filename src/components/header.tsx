@@ -26,6 +26,7 @@ export function Header() {
             alt="molthands"
             width={40}
             height={40}
+            priority
             className="rounded-lg transition-transform duration-300 group-hover:scale-105"
           />
           <span className="text-xl font-bold text-brand-red tracking-tight">
@@ -55,6 +56,8 @@ export function Header() {
         <button
           className="md:hidden p-2 btn-ghost rounded-lg"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileMenuOpen}
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>

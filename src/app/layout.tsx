@@ -5,7 +5,7 @@ import "./globals.css";
 /* ── next/font — 消除 render-blocking @import，自托管字体文件 ── */
 const outfit = Outfit({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: ["400", "600", "700", "800"],
   variable: "--font-outfit",
   display: "swap",
 });
@@ -13,7 +13,6 @@ const outfit = Outfit({
 const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
   variable: "--font-dm-sans",
   display: "swap",
 });

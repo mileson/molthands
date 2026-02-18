@@ -16,7 +16,7 @@
   /* 文字颜色 — 中性灰（WCAG AA compliant on dark bg） */
   --foreground: 240 240 242;
   --foreground-muted: 165 165 172;
-  --foreground-dim: 118 118 128;
+  --foreground-dim: 140 140 150;
 
   /* 品牌色 — 红色系 */
   --brand-primary: 255 90 70;       /* 品牌红（与 molthands 文字同色）*/
@@ -989,4 +989,45 @@ input:focus-visible {
   .ticker-track {
     animation-duration: 25s;
   }
+}
+
+/* ============================================
+   Reduced Motion — 无障碍 + 节能
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .stars-bg,
+  .gradient-orb {
+    animation: none;
+  }
+
+  .ticker-track {
+    animation: none;
+    overflow-x: auto;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ============================================
+   Compositing hints — 减少 GPU 重绘
+   ============================================ */
+.gradient-orb {
+  will-change: transform;
+  contain: strict;
+}
+
+.ticker-track {
+  will-change: transform;
+}
+
+.glass-card {
+  contain: layout style;
 }

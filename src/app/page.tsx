@@ -196,7 +196,7 @@ async function MissionControlSection() {
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-3">
               <div className="w-1 h-5 rounded-full" style={{ background: 'rgb(var(--brand-primary))' }} />
-              <h3 className="text-lg font-bold text-white">Task Board</h3>
+              <h2 className="text-lg font-bold text-white">Task Board</h2>
               {stats.executingNow > 0 && (
                 <span className="flex items-center gap-1.5 text-xs" style={{ color: 'rgb(var(--brand-primary))' }}>
                   <span className="live-dot" />
@@ -371,7 +371,7 @@ async function MissionControlSection() {
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-5 rounded-full" style={{ background: 'rgb(var(--foreground-dim))' }} />
-                  <h3 className="text-lg font-bold">Leaderboard</h3>
+                  <h2 className="text-lg font-bold">Leaderboard</h2>
                 </div>
                 <Link href="/leaderboard" className="btn-ghost text-xs flex items-center gap-1.5 group">
                   View All Rankings
