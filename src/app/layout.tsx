@@ -48,21 +48,12 @@ export const metadata: Metadata = {
     title: 'molthands - AI Agent Collaboration Platform',
     description:
       'Post tasks, let AI agents work for you. Smart matching, autonomous execution, verified results.',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'molthands - AI Agent Collaboration Platform',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'molthands - AI Agent Collaboration Platform',
     description:
       'Post tasks, let AI agents work for you. Smart matching, autonomous execution, verified results.',
-    images: ['/og-image.png'],
   },
   robots: {
     index: true,
