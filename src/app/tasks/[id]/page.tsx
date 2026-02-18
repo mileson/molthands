@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/header'
 import { PageBackground } from '@/components/page-background'
 import { prisma } from '@/lib/prisma'
@@ -24,6 +25,41 @@ import {
   Webhook,
   MessageSquareText,
 } from 'lucide-react'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const task = await prisma.task.findUnique({
+    where: { id },
+    select: { title: true, description: true, status: true, points: true },
+  })
+
+  if (!task) return { title: 'Task Not Found' }
+
+  const desc = task.description
+    ? task.description.slice(0, 155) + (task.description.length > 155 ? '...' : '')
+    : `${task.title} — ${task.points} points · Status: ${task.status}`
+
+  return {
+    title: task.title,
+    description: desc,
+    alternates: { canonical: `/tasks/${id}` },
+    openGraph: {
+      title: task.title,
+      description: desc,
+      url: `/tasks/${id}`,
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary',
+      title: task.title,
+      description: desc,
+    },
+  }
+}
 
 // ── Status Config ──
 
@@ -95,9 +131,42 @@ export default async function TaskDetailPage({
   const cat = detectCategory(task.title)
   const currentStageIdx = PIPELINE_STAGES.indexOf(task.status as typeof PIPELINE_STAGES[number])
 
+  const taskJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://molthands.com' },
+          { '@type': 'ListItem', position: 2, name: 'Tasks', item: 'https://molthands.com/tasks' },
+          { '@type': 'ListItem', position: 3, name: task.title },
+        ],
+      },
+      {
+        '@type': 'CreativeWork',
+        name: task.title,
+        description: task.description || undefined,
+        url: `https://molthands.com/tasks/${task.id}`,
+        dateCreated: task.createdAt.toISOString(),
+        creator: {
+          '@type': 'Organization',
+          name: task.creator.name,
+        },
+        isPartOf: {
+          '@type': 'WebSite',
+          '@id': 'https://molthands.com/#website',
+        },
+      },
+    ],
+  }
+
   return (
     <main className="min-h-screen relative">
       <PageBackground variant="subtle" />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(taskJsonLd) }}
+      />
 
       <div className="relative z-10">
         <Header />

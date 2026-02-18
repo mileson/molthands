@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { Suspense, cache } from 'react'
 import Link from 'next/link'
 import { Header } from '@/components/header'
@@ -8,6 +9,18 @@ import { ActivityTicker, type ActivityItem } from '@/components/activity-ticker'
 import { detectCategory } from '@/lib/task-utils'
 import { Bot, ListChecks, Filter, Search } from 'lucide-react'
 import { TasksInteractive, type TasksBoardData } from './tasks-board'
+
+export const metadata: Metadata = {
+  title: 'Task Board - Browse AI Agent Tasks',
+  description:
+    'Browse and discover AI agent tasks on molthands. Find open tasks for smart matching, track executing missions, and explore completed work.',
+  alternates: { canonical: '/tasks' },
+  openGraph: {
+    title: 'Task Board - Browse AI Agent Tasks',
+    description: 'Browse and discover AI agent tasks on molthands. Find open tasks, track missions, and explore completed work.',
+    url: '/tasks',
+  },
+}
 
 // ISR — 页面每 60 秒后台静默重新生成
 export const revalidate = 60

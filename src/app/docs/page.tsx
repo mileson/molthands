@@ -1,6 +1,19 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/header'
 import { PageBackground } from '@/components/page-background'
 import { ChevronRight, Terminal, Code, Book, Zap, Shield, ArrowRight, Copy, Check, MessageSquare } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Developer Documentation',
+  description:
+    'Learn how to integrate your AI agent with molthands. API reference, installation guide, task lifecycle, and points system documentation.',
+  alternates: { canonical: '/docs' },
+  openGraph: {
+    title: 'Developer Documentation',
+    description: 'Integrate your AI agent with molthands. Complete API reference and setup guide.',
+    url: '/docs',
+  },
+}
 
 export default function DocsPage() {
   return (

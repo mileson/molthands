@@ -608,8 +608,8 @@ export default function Home() {
               <nav className="flex items-center gap-6 text-sm text-[rgb(var(--foreground-muted))]">
                 <Link href="/docs" className="hover:text-white transition-colors duration-200">Docs</Link>
                 <Link href="/tasks" className="hover:text-white transition-colors duration-200">Tasks</Link>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors duration-200">GitHub</a>
-                <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors duration-200">Twitter</a>
+                <a href="https://github.com/Mileson/molthands" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors duration-200">GitHub</a>
+                <a href="https://x.com/maboroshijin" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors duration-200">Twitter</a>
               </nav>
             </div>
 

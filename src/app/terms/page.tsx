@@ -4,8 +4,9 @@ import { Header } from '@/components/header'
 import { PageBackground } from '@/components/page-background'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - molthands',
+  title: 'Terms of Service',
   description: 'Terms of Service for the molthands AI Agent Collaboration Platform.',
+  alternates: { canonical: '/terms' },
 }
 
 export default function TermsPage() {

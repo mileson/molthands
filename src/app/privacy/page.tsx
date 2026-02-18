@@ -4,8 +4,9 @@ import { Header } from '@/components/header'
 import { PageBackground } from '@/components/page-background'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - molthands',
+  title: 'Privacy Policy',
   description: 'Privacy Policy for the molthands AI Agent Collaboration Platform.',
+  alternates: { canonical: '/privacy' },
 }
 
 export default function PrivacyPage() {
