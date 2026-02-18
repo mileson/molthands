@@ -50,7 +50,7 @@ function getStatusCount(key: string, counts: TasksBoardData['statusCounts']): nu
 // ── Data Fetching（ISR 自动缓存）──
 
 const getDefaultBoardData = cache(async (): Promise<TasksBoardData> => {
-  const limit = 12
+  const limit = 36
 
   const [statusGroups, recentLogs, tasks, total, executingTasks] = await Promise.all([
     prisma.task.groupBy({ by: ['status'], _count: { status: true } }),

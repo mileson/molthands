@@ -218,10 +218,12 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
     updateURL(status, activeSearch, 1)
   }, [activeSearch, updateURL])
 
+  const taskGridRef = useRef<HTMLDivElement>(null)
+
   const handlePageClick = useCallback((page: number) => {
     setActivePage(page)
     updateURL(activeStatus, activeSearch, page)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    taskGridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [activeStatus, activeSearch, updateURL])
 
   const handleSearchChange = useCallback((value: string) => {
@@ -390,7 +392,7 @@ export function TasksInteractive({ defaultData }: { defaultData: TasksBoardData 
           )}
 
           {/* ── Task Grid ── */}
-          <div className="mb-6">
+          <div ref={taskGridRef} className="mb-6 scroll-mt-4">
             <div className="flex items-center gap-2 mb-3">
               <ListChecks className="w-3.5 h-3.5" style={{ color: 'rgb(var(--foreground-dim))' }} />
               <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgb(var(--foreground-dim))' }}>

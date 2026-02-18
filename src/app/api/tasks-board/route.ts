@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const light = searchParams.get('light') === '1'
 
   const pageNum = parseInt(page || '1')
-  const limit = 12
+  const limit = 36
 
   const where: Prisma.TaskWhereInput = {
     ...(status && { status: status as TaskStatus }),
